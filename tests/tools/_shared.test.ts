@@ -5,6 +5,7 @@ import {
   textResponse,
   resolveUserId,
   summarizeTrail,
+  summarizeTrailDetail,
   fetchTrailListing,
 } from '../../src/tools/_shared.js';
 
@@ -84,7 +85,9 @@ describe('summarizeTrail', () => {
       name: 'Angels Landing',
       slug: 'us/utah/angels-landing-trail',
       lengthMeters: 8047,
+      lengthMiles: 5,
       elevationGainMeters: 452,
+      elevationGainFeet: 1483,
       difficulty: 5,
       rating: 4.8,
       numReviews: 12000,
@@ -102,6 +105,40 @@ describe('summarizeTrail', () => {
   it('leaves id undefined when no id variant is present', () => {
     expect(summarizeTrail({ name: 'Nameless' }).id).toBeUndefined();
   });
+
+  it('omits imperial conversions when the metric fields are absent', () => {
+    const s = summarizeTrail({ name: 'Nameless' });
+    expect(s.lengthMiles).toBeUndefined();
+    expect(s.elevationGainFeet).toBeUndefined();
+  });
+});
+
+describe('summarizeTrailDetail', () => {
+  it('adds overview, route type, and location to the listing summary', () => {
+    expect(summarizeTrailDetail({
+      id: 7,
+      name: 'Rim Trail',
+      length: 1609.344,
+      overview: 'A scenic rim walk.',
+      routeType: { name: 'Out & back' },
+      location: { latitude: 36.06, longitude: -112.14, city: 'Grand Canyon', region: 'Arizona', country: 'United States' },
+    })).toEqual({
+      id: '7',
+      name: 'Rim Trail',
+      lengthMeters: 1609.344,
+      lengthMiles: 1,
+      overview: 'A scenic rim walk.',
+      routeType: 'Out & back',
+      location: { latitude: 36.06, longitude: -112.14, city: 'Grand Canyon', region: 'Arizona', country: 'United States' },
+    });
+  });
+
+  it('leaves detail fields undefined when absent', () => {
+    const s = summarizeTrailDetail({ id: 1 });
+    expect(s.overview).toBeUndefined();
+    expect(s.routeType).toBeUndefined();
+    expect(s.location).toBeUndefined();
+  });
 });
 
 describe('fetchTrailListing', () => {
@@ -118,7 +155,9 @@ describe('fetchTrailListing', () => {
     expect(c.request).toHaveBeenCalledWith('GET', '/api/alltrails/locations/states/9/trails');
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.count).toBe(2);
-    expect(parsed.trails[0]).toEqual({ id: '1', name: 'A', lengthMeters: 1000, difficulty: 3, rating: 4.1 });
+    expect(parsed.trails[0]).toEqual({
+      id: '1', name: 'A', lengthMeters: 1000, lengthMiles: 0.62, difficulty: 3, rating: 4.1,
+    });
     expect(parsed.trails[1]).toEqual({ id: '2', name: 'B' });
   });
 

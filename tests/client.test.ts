@@ -8,6 +8,7 @@ interface MockResponse {
   status: number;
   body?: unknown;
   text?: string;
+  headers?: Record<string, string>;
 }
 
 // Login uses the env-cookie path (no network), so the ONLY fetches are the API
@@ -16,10 +17,12 @@ function mockFetch(responses: MockResponse[]) {
   let idx = 0;
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
     const r = responses[idx++] ?? { status: 200, body: {} };
+    const headerMap = r.headers ?? {};
     return {
       ok: r.status >= 200 && r.status < 300,
       status: r.status,
       statusText: String(r.status),
+      headers: { get: (k: string) => headerMap[k.toLowerCase()] ?? null },
       text: async () => (r.text !== undefined ? r.text : JSON.stringify(r.body)),
     } as unknown as Response;
   });
@@ -146,6 +149,59 @@ describe('AllTrailsClient', () => {
       promise.catch(() => {});
       await vi.advanceTimersByTimeAsync(2000);
       await expect(promise).rejects.toThrow('Rate limited');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('honors a delta-seconds Retry-After on 429', async () => {
+    vi.useFakeTimers();
+    try {
+      const spy = mockFetch([
+        { status: 429, body: {}, headers: { 'retry-after': '5' } },
+        { status: 200, body: { ok: true } },
+      ]);
+      const client = new AllTrailsClient();
+      const promise = client.request('GET', '/api/alltrails/x');
+      // The fleet-standard 2s must NOT be enough — the server asked for 5s.
+      await vi.advanceTimersByTimeAsync(4999);
+      expect(spy).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await promise).toEqual({ ok: true });
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('caps a hostile/buggy Retry-After at 30s', async () => {
+    vi.useFakeTimers();
+    try {
+      const spy = mockFetch([
+        { status: 429, body: {}, headers: { 'retry-after': '3600' } },
+        { status: 200, body: { ok: 1 } },
+      ]);
+      const client = new AllTrailsClient();
+      const promise = client.request('GET', '/api/alltrails/x');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(await promise).toEqual({ ok: 1 });
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('falls back to the 2s default for a non-numeric (HTTP-date) Retry-After', async () => {
+    vi.useFakeTimers();
+    try {
+      const spy = mockFetch([
+        { status: 429, body: {}, headers: { 'retry-after': 'Wed, 01 Jul 2026 16:00:00 GMT' } },
+        { status: 200, body: { ok: 2 } },
+      ]);
+      const promise = new AllTrailsClient().request('GET', '/api/alltrails/x');
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(await promise).toEqual({ ok: 2 });
+      expect(spy).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }

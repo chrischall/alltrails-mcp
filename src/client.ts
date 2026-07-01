@@ -64,7 +64,15 @@ export class AllTrailsClient {
       this.fetchOnce(method, path, body, session, attempt++ > 0),
     );
     if (response.status === 429) {
-      await new Promise<void>((r) => setTimeout(r, 2000));
+      // Honor a delta-seconds Retry-After when the server sends one (capped at
+      // 30s so a hostile/buggy value can't stall the tool call); otherwise the
+      // fleet's standard 2s.
+      const retryAfterRaw = Number(response.headers.get('retry-after') ?? '');
+      const waitMs =
+        Number.isFinite(retryAfterRaw) && retryAfterRaw > 0
+          ? Math.min(retryAfterRaw, 30) * 1000
+          : 2000;
+      await new Promise<void>((r) => setTimeout(r, waitMs));
       response = await mgr.withSession((session) => this.fetchOnce(method, path, body, session, true));
       if (response.status === 429) throw new Error('Rate limited by AllTrails API');
     }

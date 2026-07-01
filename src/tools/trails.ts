@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
-import { jsonResponse, ReviewListSchema, summarizeReview } from './_shared.js';
+import { jsonResponse, ReviewListSchema, summarizeReview, TrailDetailSchema, summarizeTrailDetail } from './_shared.js';
 import { parseAllTrails } from '../validate.js';
 
 // Trail-scoped read tools: detail, reviews, photos, weather. All read-only.
@@ -9,7 +9,9 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool('alltrails_get_trail', {
     description:
       'Get details for a single AllTrails trail by its numeric trail id. Returns name, location, ' +
-      'length, elevation gain, difficulty, rating, route type, and (at higher detail levels) route geometry.',
+      'length, elevation gain, difficulty, rating, route type, and (at higher detail levels) route geometry. ' +
+      'Set compact=true for a slim projection (name, overview, length in m+mi, elevation gain, difficulty, ' +
+      'rating, route type, location) — recommended unless you need the full record or geometry.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       trailId: z.string().describe('Numeric AllTrails trail id (e.g. "10236086")'),
@@ -17,14 +19,24 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         .enum(['basic', 'medium', 'offline'])
         .describe('Detail level. "medium" (default) is a good overview; "offline" includes full route geometry.')
         .optional(),
+      compact: z.boolean().describe('Return a slim projection instead of the full record (default false)').optional(),
     },
   }, async (args) => {
     const detail = args.detail ?? 'medium';
-    const data = await client.request(
+    const raw = await client.request(
       'GET',
       `/api/alltrails/v3/trails/${encodeURIComponent(args.trailId)}?detail=${detail}`,
     );
-    return jsonResponse(data);
+    if (args.compact) {
+      const parsed = parseAllTrails(TrailDetailSchema, raw, 'GET /api/alltrails/v3/trails/{id}');
+      if (Array.isArray(parsed.trails)) {
+        const trails = parsed.trails.map(summarizeTrailDetail);
+        // The envelope is a one-element array in practice; unwrap it so the
+        // common case reads as a single object.
+        return jsonResponse(trails.length === 1 ? trails[0] : trails);
+      }
+    }
+    return jsonResponse(raw);
   });
 
   server.registerTool('alltrails_get_trail_reviews', {

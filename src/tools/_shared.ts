@@ -73,7 +73,11 @@ export interface TrailSummary {
   name?: string;
   slug?: string;
   lengthMeters?: number;
+  /** Derived from lengthMeters (2 decimal places) — AllTrails stores metric. */
+  lengthMiles?: number;
   elevationGainMeters?: number;
+  /** Derived from elevationGainMeters (whole feet). */
+  elevationGainFeet?: number;
   difficulty?: number | string;
   rating?: number;
   numReviews?: number | string;
@@ -82,10 +86,25 @@ export interface TrailSummary {
   popularity?: number;
 }
 
+const METERS_PER_MILE = 1609.344;
+const FEET_PER_METER = 3.28084;
+
+/** Meters → miles, rounded to 2 decimals. Undefined passes through. */
+export function metersToMiles(m: number | undefined): number | undefined {
+  return m === undefined ? undefined : Math.round((m / METERS_PER_MILE) * 100) / 100;
+}
+
+/** Meters → feet, rounded to a whole number. Undefined passes through. */
+export function metersToFeet(m: number | undefined): number | undefined {
+  return m === undefined ? undefined : Math.round(m * FEET_PER_METER);
+}
+
 /**
  * Project a raw listing trail into a {@link TrailSummary}. `undefined` fields
  * are dropped by `JSON.stringify`, so the emitted object only carries what the
  * API actually returned. The id falls back across the endpoint's id variants.
+ * Imperial fields are derived locally (AllTrails stores metric), so an agent
+ * answering a US user never has to do the conversion itself.
  */
 export function summarizeTrail(raw: RawTrail): TrailSummary {
   const id = raw.objectID ?? raw.ID ?? raw.id;
@@ -94,13 +113,59 @@ export function summarizeTrail(raw: RawTrail): TrailSummary {
     name: raw.name,
     slug: raw.slug,
     lengthMeters: raw.length,
+    lengthMiles: metersToMiles(raw.length),
     elevationGainMeters: raw.elevation_gain,
+    elevationGainFeet: metersToFeet(raw.elevation_gain),
     difficulty: raw.difficulty_rating,
     rating: raw.avg_rating,
     numReviews: raw.num_reviews,
     area: raw.area_name,
     region: raw.state_name,
     popularity: raw.popularity,
+  };
+}
+
+// Detail-only fields on `GET /v3/trails/{id}` (same `{ trails: [...] }`
+// envelope as the listings, richer per-trail record). Loose as always.
+const RawTrailDetailSchema = RawTrailSchema.extend({
+  overview: z.string().optional(),
+  routeType: z.looseObject({ name: z.string().optional() }).optional(),
+  location: z
+    .looseObject({
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
+      city: z.string().optional(),
+      region: z.string().optional(),
+      country: z.string().optional(),
+    })
+    .optional(),
+});
+
+// Detail envelope — one-element `trails` array in practice; we project them all.
+export const TrailDetailSchema = z.looseObject({
+  trails: z.array(RawTrailDetailSchema).optional(),
+});
+
+/** {@link TrailSummary} plus the detail-only fields worth keeping in compact mode. */
+export interface TrailDetailSummary extends TrailSummary {
+  overview?: string;
+  routeType?: string;
+  location?: { latitude?: number; longitude?: number; city?: string; region?: string; country?: string };
+}
+
+/** Project a raw detail trail: the listing summary plus overview/route type/location. */
+export function summarizeTrailDetail(raw: z.infer<typeof RawTrailDetailSchema>): TrailDetailSummary {
+  return {
+    ...summarizeTrail(raw),
+    overview: raw.overview,
+    routeType: raw.routeType?.name,
+    location: raw.location && {
+      latitude: raw.location.latitude,
+      longitude: raw.location.longitude,
+      city: raw.location.city,
+      region: raw.location.region,
+      country: raw.location.country,
+    },
   };
 }
 

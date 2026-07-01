@@ -39,6 +39,41 @@ describe('alltrails_get_trail', () => {
     const result = await handlers.get('alltrails_get_trail')!({ trailId: '1' });
     expect(JSON.parse(result.content[0].text)).toEqual(trail);
   });
+
+  it('compact=true unwraps the one-element envelope to a single slim object', async () => {
+    const { handlers } = setup({
+      trails: [{
+        id: 1,
+        name: 'Trail',
+        length: 3218.688,
+        overview: 'Nice.',
+        routeType: { name: 'Loop' },
+        geoloc: { lat: 1, lng: 2 }, // extra field — dropped by the projection
+      }],
+    });
+    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1', compact: true });
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      id: '1',
+      name: 'Trail',
+      lengthMeters: 3218.688,
+      lengthMiles: 2,
+      overview: 'Nice.',
+      routeType: 'Loop',
+    });
+  });
+
+  it('compact=true keeps a multi-element envelope as an array', async () => {
+    const { handlers } = setup({ trails: [{ id: 1 }, { id: 2 }] });
+    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1', compact: true });
+    expect(JSON.parse(result.content[0].text)).toEqual([{ id: '1' }, { id: '2' }]);
+  });
+
+  it('compact=true falls back to raw when the detail shape drifted (no trails array)', async () => {
+    const raw = { trail: { id: 1 } };
+    const { handlers } = setup(raw);
+    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1', compact: true });
+    expect(JSON.parse(result.content[0].text)).toEqual(raw);
+  });
 });
 
 describe('alltrails_get_trail_reviews', () => {
