@@ -67,6 +67,13 @@ describe('alltrails_list_trails_by_state', () => {
       '/api/alltrails/locations/states/99/trails?page=3&per_page=100&algolia_formatted=true',
     );
   });
+
+  it('returns a compact summary when compact=true', async () => {
+    const { handlers } = setup({ trails: [{ objectID: 5, name: 'Ridge', avg_rating: 4.2 }] });
+    const result = await handlers.get('alltrails_list_trails_by_state')!({ stateId: '99', compact: true });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed).toEqual({ count: 1, trails: [{ id: '5', name: 'Ridge', rating: 4.2 }] });
+  });
 });
 
 describe('alltrails_list_trails_by_country', () => {
@@ -86,5 +93,11 @@ describe('alltrails_list_trails_by_country', () => {
       'GET',
       '/api/alltrails/locations/countries/313/trails?page=2&per_page=50&algolia_formatted=true',
     );
+  });
+
+  it('returns a compact summary when compact=true', async () => {
+    const { handlers } = setup({ trails: [{ ID: 9, name: 'Loop' }] });
+    const result = await handlers.get('alltrails_list_trails_by_country')!({ countryId: '313', compact: true });
+    expect(JSON.parse(result.content[0].text)).toEqual({ count: 1, trails: [{ id: '9', name: 'Loop' }] });
   });
 });

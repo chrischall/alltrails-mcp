@@ -26,9 +26,9 @@ src/
   config.ts         env-driven header/UA/api-key/user-id/timeout/debug getters
   validate.ts       parseAllTrails(): zod validation of AllTrails responses at call sites (lenient reads / strict where a mistype must halt)
   tools/
-    _shared.ts      response helpers + resolveUserId (arg → ALLTRAILS_USER_ID → /api/alltrails/me)
+    _shared.ts      response helpers + resolveUserId (arg → ALLTRAILS_USER_ID → /api/alltrails/me) + summarizeTrail/fetchTrailListing (compact listing projection)
     trails.ts       get_trail, get_trail_reviews, get_trail_photos, get_trail_weather
-    explore.ts      search, list_trails_by_state, list_trails_by_country
+    explore.ts      search, list_trails_by_state, list_trails_by_country (both listings take compact?: slim per-trail summary)
     user.ts         get_profile, list_user_lists, list_completed_trails, get_activity_feed
 tests/              mirrors src/; mocks AllTrailsClient.request via vi.spyOn; auth tests mock @fetchproxy/bootstrap at the module boundary
 ```

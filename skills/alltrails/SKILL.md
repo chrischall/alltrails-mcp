@@ -38,8 +38,8 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
 | Tool | Notes |
 |------|-------|
 | `alltrails_search(query?, lat?, lng?, limit?)` | Search trails by text and/or lat/lng. Internal explore endpoint — response shape is undocumented. |
-| `alltrails_list_trails_by_state(stateId, page?, perPage?)` | Paginated listing of trails in a state/region. |
-| `alltrails_list_trails_by_country(countryId, page?, perPage?)` | Paginated listing of trails in a country (e.g. `313` = US). |
+| `alltrails_list_trails_by_state(stateId, page?, perPage?, compact?)` | Paginated listing of trails in a state/region. `compact=true` returns a slim summary per trail (id, name, length, difficulty, rating, …) — far less output for browsing/ranking. |
+| `alltrails_list_trails_by_country(countryId, page?, perPage?, compact?)` | Paginated listing of trails in a country (e.g. `313` = US). Supports `compact`. |
 
 ### Trail detail
 | Tool | Notes |

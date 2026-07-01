@@ -40,3 +40,88 @@ export async function resolveUserId(client: AllTrailsClient, provided?: string):
   }
   return `${id}`;
 }
+
+// A single trail as it appears in the `locations/{states|countries}/{id}/trails`
+// listing responses. Loose — only the fields the compact projection reads are
+// named; everything else passes through. The id lives under `objectID`/`ID`/`id`
+// depending on the endpoint variant, so all three are optional.
+const RawTrailSchema = z.looseObject({
+  objectID: z.union([z.number(), z.string()]).optional(),
+  ID: z.union([z.number(), z.string()]).optional(),
+  id: z.union([z.number(), z.string()]).optional(),
+  name: z.string().optional(),
+  slug: z.string().optional(),
+  length: z.number().optional(),
+  elevation_gain: z.number().optional(),
+  difficulty_rating: z.union([z.number(), z.string()]).optional(),
+  avg_rating: z.number().optional(),
+  num_reviews: z.union([z.number(), z.string()]).optional(),
+  area_name: z.string().optional(),
+  state_name: z.string().optional(),
+  popularity: z.number().optional(),
+});
+type RawTrail = z.infer<typeof RawTrailSchema>;
+
+// Listing envelope: the endpoints wrap the results in `{ trails: [...] }`.
+export const TrailListSchema = z.looseObject({
+  trails: z.array(RawTrailSchema).optional(),
+});
+
+/** A compact, agent-friendly projection of a listing trail — the fields worth ranking on. */
+export interface TrailSummary {
+  id?: string;
+  name?: string;
+  slug?: string;
+  lengthMeters?: number;
+  elevationGainMeters?: number;
+  difficulty?: number | string;
+  rating?: number;
+  numReviews?: number | string;
+  area?: string;
+  region?: string;
+  popularity?: number;
+}
+
+/**
+ * Project a raw listing trail into a {@link TrailSummary}. `undefined` fields
+ * are dropped by `JSON.stringify`, so the emitted object only carries what the
+ * API actually returned. The id falls back across the endpoint's id variants.
+ */
+export function summarizeTrail(raw: RawTrail): TrailSummary {
+  const id = raw.objectID ?? raw.ID ?? raw.id;
+  return {
+    id: id === undefined ? undefined : `${id}`,
+    name: raw.name,
+    slug: raw.slug,
+    lengthMeters: raw.length,
+    elevationGainMeters: raw.elevation_gain,
+    difficulty: raw.difficulty_rating,
+    rating: raw.avg_rating,
+    numReviews: raw.num_reviews,
+    area: raw.area_name,
+    region: raw.state_name,
+    popularity: raw.popularity,
+  };
+}
+
+/**
+ * GET a trail-listing endpoint and return the tool result. Validates the
+ * envelope (lenient — drift warns to stderr, never throws). When `compact` is
+ * set and the response carried the expected `trails` array, returns a slim
+ * `{ count, trails: TrailSummary[] }`; otherwise returns the raw response
+ * unchanged (full detail, and the safe fallback if the shape drifted).
+ */
+export async function fetchTrailListing(
+  client: AllTrailsClient,
+  path: string,
+  ctx: string,
+  compact: boolean,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const raw = await client.request('GET', path);
+  const parsed = parseAllTrails(TrailListSchema, raw, ctx);
+  if (compact && Array.isArray(parsed.trails)) {
+    const trails = parsed.trails.map(summarizeTrail);
+    return jsonResponse({ count: trails.length, trails });
+  }
+  return jsonResponse(raw);
+}

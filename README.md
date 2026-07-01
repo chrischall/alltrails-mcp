@@ -113,8 +113,8 @@ All tools are **read-only** — this server never writes to AllTrails.
 | Tool | What it does |
 |------|-------------|
 | `alltrails_search` | Search trails by text and/or lat/lng |
-| `alltrails_list_trails_by_state` | Paginated listing of trails in a state/region |
-| `alltrails_list_trails_by_country` | Paginated listing of trails in a country (e.g. `313` = US) |
+| `alltrails_list_trails_by_state` | Paginated listing of trails in a state/region (`compact` for slim summaries) |
+| `alltrails_list_trails_by_country` | Paginated listing of trails in a country, e.g. `313` = US (`compact` supported) |
 | `alltrails_get_trail` | Trail details (`detail`: `basic`/`medium`/`offline`) |
 | `alltrails_get_trail_reviews` | User reviews for a trail |
 | `alltrails_get_trail_photos` | Photos for a trail |

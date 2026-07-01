@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
-import { jsonResponse } from './_shared.js';
+import { fetchTrailListing, jsonResponse } from './_shared.js';
 
 // Discovery tools: full-text/geographic search plus bulk listing by
 // state/country. All read-only.
@@ -30,12 +30,15 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
   server.registerTool('alltrails_list_trails_by_state', {
     description:
       'List trails within a US state (or other region) by its numeric AllTrails state id. Returns a rich, ' +
-      'paginated listing (name, slug, length, elevation gain, difficulty, rating, features, activities).',
+      'paginated listing (name, slug, length, elevation gain, difficulty, rating, features, activities). ' +
+      'Set compact=true to get a slimmed summary per trail (id, name, length, difficulty, rating, …) — ' +
+      'much smaller output when you just need to browse or rank.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       stateId: z.string().describe('Numeric AllTrails state/region id'),
       page: z.number().int().positive().describe('Page number (default 1)').optional(),
       perPage: z.number().int().positive().describe('Results per page (default 25, max ~100)').optional(),
+      compact: z.boolean().describe('Return a slim summary per trail instead of the full records (default false)').optional(),
     },
   }, async (args) => {
     const params = new URLSearchParams({
@@ -43,21 +46,20 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
       per_page: String(args.perPage ?? 25),
       algolia_formatted: 'true',
     });
-    const data = await client.request(
-      'GET',
-      `/api/alltrails/locations/states/${encodeURIComponent(args.stateId)}/trails?${params.toString()}`,
-    );
-    return jsonResponse(data);
+    const path = `/api/alltrails/locations/states/${encodeURIComponent(args.stateId)}/trails?${params.toString()}`;
+    return fetchTrailListing(client, path, 'GET /api/alltrails/locations/states/{id}/trails', args.compact ?? false);
   });
 
   server.registerTool('alltrails_list_trails_by_country', {
     description:
-      'List trails within a country by its numeric AllTrails country id (e.g. 313 = United States). Paginated.',
+      'List trails within a country by its numeric AllTrails country id (e.g. 313 = United States). Paginated. ' +
+      'Set compact=true to get a slimmed summary per trail (id, name, length, difficulty, rating, …).',
     annotations: { readOnlyHint: true },
     inputSchema: {
       countryId: z.string().describe('Numeric AllTrails country id (e.g. "313" for the US)'),
       page: z.number().int().positive().describe('Page number (default 1)').optional(),
       perPage: z.number().int().positive().describe('Results per page (default 25, max ~100)').optional(),
+      compact: z.boolean().describe('Return a slim summary per trail instead of the full records (default false)').optional(),
     },
   }, async (args) => {
     const params = new URLSearchParams({
@@ -65,10 +67,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
       per_page: String(args.perPage ?? 25),
       algolia_formatted: 'true',
     });
-    const data = await client.request(
-      'GET',
-      `/api/alltrails/locations/countries/${encodeURIComponent(args.countryId)}/trails?${params.toString()}`,
-    );
-    return jsonResponse(data);
+    const path = `/api/alltrails/locations/countries/${encodeURIComponent(args.countryId)}/trails?${params.toString()}`;
+    return fetchTrailListing(client, path, 'GET /api/alltrails/locations/countries/{id}/trails', args.compact ?? false);
   });
 }
