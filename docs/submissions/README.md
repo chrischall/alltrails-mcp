@@ -1,4 +1,4 @@
-# Registry submissions — ofw-mcp
+# Registry submissions — alltrails-mcp
 
 Ready-to-paste copy for registries that need a manual browser-form submission. Automated pipelines run from the `publish` job in `.github/workflows/release-please.yml` after release-please creates a new tag.
 
@@ -16,16 +16,16 @@ Ready-to-paste copy for registries that need a manual browser-form submission. A
 
 ## mcpservers.org
 
-- **Server Name:** `ofw-mcp`
-- **Short Description:** `OurFamilyWizard co-parenting tools for Claude — messages, calendar, expenses, and journal via natural language`
-- **Link:** `https://github.com/chrischall/ofw-mcp`
+- **Server Name:** `alltrails-mcp`
+- **Short Description:** `Unofficial AllTrails tools for Claude — search trails, details, reviews, photos, and saved lists`
+- **Link:** `https://github.com/chrischall/alltrails-mcp`
 - **Category:** `Productivity`
 - **Contact Email:** `chris.c.hall@gmail.com`
 
 ## Anthropic community plugins
 
-- **Repo URL:** `https://github.com/chrischall/ofw-mcp`
-- **Plugin name:** `ofw-mcp`
-- **Short description:** `OurFamilyWizard co-parenting tools for Claude — messages, calendar, expenses, and journal via natural language`
+- **Repo URL:** `https://github.com/chrischall/alltrails-mcp`
+- **Plugin name:** `alltrails-mcp`
+- **Short description:** `Unofficial AllTrails tools for Claude — search trails, details, reviews, photos, and saved lists`
 - **Category:** Productivity
-- **Tags:** ofw, ourfamilywizard, co-parenting, family, messages, calendar, expenses, mcp
+- **Tags:** alltrails, trails, hiking, outdoors, maps, mcp

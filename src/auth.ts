@@ -1,156 +1,142 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Auth resolution — Pattern A template
+// Auth resolution — Pattern A (browser-bootstrap + Node-direct), cookie variant
 // ────────────────────────────────────────────────────────────────────────────
 //
-// This file is the canonical shape for "browser-bootstrap + Node-direct"
-// auth used across our MCP servers. The other six MCPs in this family
-// (resy-mcp, opentable-mcp, splitwise-mcp, …) will model their auth
-// resolution after this one — keep the structure flat, the path-selection
-// explicit, and the error messages actionable.
+// This mirrors the fleet's canonical "capture a signed-in browser session once,
+// then operate from Node directly" shape (see ofw-mcp's auth.ts). AllTrails
+// differs from the token-based siblings in one important way: there is NO
+// documented username/password → token exchange. AllTrails fronts its internal
+// API with DataDome bot protection, so the only reliable way in is to reuse the
+// exact `Cookie` header a real signed-in browser sends — which already carries
+// the fresh `datadome` anti-bot cookie AND (for per-user endpoints) the login
+// session cookie. So the resolved "credential" here is a Cookie header string,
+// not a Bearer token, and the whole lifecycle is managed by
+// CookieSessionManager (client.ts) rather than TokenManager.
 //
 // THE THREE PATHS, in priority order:
 //
-//   1. Env-var credentials (existing behavior)
-//      OFW_USERNAME + OFW_PASSWORD set → POST the login form, get a token.
-//      This is the legacy path. It runs unchanged when both vars are set
-//      so existing users (Claude Desktop with mcpb env config, etc.) are
-//      not disrupted.
+//   1. Env cookie (escape hatch)
+//      ALLTRAILS_COOKIE set → use it verbatim as the `Cookie:` header. For
+//      power users who paste a header captured from DevTools, or CI. The
+//      DataDome cookie inside it is short-lived, so this is best-effort.
 //
-//   2. fetchproxy fallback (new)
-//      When credentials are absent, we try to lift the user's session
-//      out of their signed-in browser tab via the fetchproxy extension.
-//      The `@fetchproxy/bootstrap` helper spins up a one-shot WebSocket
-//      bridge, asks the extension for `localStorage["auth"]` and
-//      `localStorage["tokenExpiry"]` from any ourfamilywizard.com tab,
-//      then closes the bridge. From here on, all OFW API calls go out
-//      via plain Node `fetch()` — fetchproxy is NOT in the hot path.
-//
-//      Users opt out with OFW_DISABLE_FETCHPROXY=1 (anyone who wants the
-//      old behavior of "fail loudly when creds are missing").
+//   2. fetchproxy fallback (primary path)
+//      Capture the `cookie` (and live `x-at-key`) request header from the first
+//      `www.alltrails.com/api/alltrails/*` call the signed-in browser tab makes
+//      while the one-shot bridge is open, then close it. All subsequent API
+//      calls go out via plain Node `fetch()` — fetchproxy is NOT in the hot
+//      path. Opt out with ALLTRAILS_DISABLE_FETCHPROXY=1.
 //
 //   3. Error
-//      Nothing to authenticate with. We throw a message that tells the
-//      user exactly what to do: set creds, OR install the extension and
-//      sign in.
+//      Nothing to authenticate with. Throw an actionable message.
 //
-// Why fetchproxy is only a one-shot read:
-//   The bootstrap call snapshots the session blob and returns. The MCP
-//   then operates from Node with direct fetch + Authorization header,
-//   so latency and reliability are not coupled to the browser bridge
-//   for normal tool calls. Pre-PR mcp-chrome and tab-routing concerns
-//   (see opentable-mcp/CLAUDE.md "Bridge selection") do not apply here.
-//
-// Testability:
-//   - `@fetchproxy/bootstrap` is mocked at the module boundary in tests.
-//   - `./auth-password.js` (loginWithPassword) is a separate module
-//     specifically so it can be mocked here too. This keeps the
-//     selection logic independent of either implementation.
+// Testability: `@fetchproxy/bootstrap` is mocked at the module boundary in
+// tests, so path-selection logic stays independent of the bridge implementation.
 
 import { readEnvVar } from '@chrischall/mcp-utils';
 import { bootstrap } from '@fetchproxy/bootstrap';
 import { classifyBridgeError, FetchproxyBridgeDownError } from '@chrischall/mcp-utils/fetchproxy';
-import { loginWithPassword } from './auth-password.js';
 import { parseBoolEnv } from './config.js';
 import pkg from '../package.json' with { type: 'json' };
 
 /** Result of resolving auth, regardless of which path was taken. */
-export interface ResolvedAuth {
-  /** Bearer token for OFW API requests. */
-  token: string;
-  /** Best-effort expiry. Absent on the fetchproxy path when the browser tab didn't store one. */
-  expiresAt?: Date;
-  /** Which path produced the token. Used for diagnostics + future cache keying. */
+export interface AllTrailsSession {
+  /** The `Cookie:` request header value for API calls (datadome + login session). */
+  cookieHeader: string;
+  /** Live `x-at-key` captured from the browser, when available. Overrides the configured/default key. */
+  apiKey?: string;
+  /** Which path produced the session. Diagnostics only — callers must not branch on it. */
   source: 'env' | 'fetchproxy';
 }
 
 /**
- * Read an env var, trim, and treat blank / `${UNEXPANDED}` placeholders as
- * unset. Defends against MCP hosts that pass `.mcp.json` env blocks through
- * without variable expansion. Delegates to @chrischall/mcp-utils' `readEnvVar`,
- * which applies the identical sanitization (blank, `undefined`/`null`,
- * `${...}` placeholder → unset).
+ * A configuration error (nothing to authenticate with, or fetchproxy disabled
+ * with no cookie). Distinct from a transient bridge failure so the
+ * CookieSessionManager can cache it as permanent and stop retrying every call.
  */
-function readEnv(key: string): string | undefined {
-  return readEnvVar(key);
+export class AllTrailsConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AllTrailsConfigError';
+  }
 }
 
 /** True if the user has explicitly disabled the fetchproxy fallback. */
 function fetchproxyDisabled(): boolean {
-  return parseBoolEnv('OFW_DISABLE_FETCHPROXY');
+  return parseBoolEnv('ALLTRAILS_DISABLE_FETCHPROXY');
 }
 
 /**
- * Resolve OFW auth using the three-path priority described at the top of
- * this file. Throws with an actionable error message when no path succeeds.
- *
- * Callers (i.e. the `OFWClient` TokenManager refresh callback) treat the
- * return value as opaque credentials — they should not branch on `source`.
- * The field exists for logging / future cache-keying only.
+ * Resolve an AllTrails session using the three-path priority above. Throws
+ * {@link AllTrailsConfigError} when nothing is configured (permanent), or a
+ * plain Error when the fetchproxy bridge fails transiently (worth retrying
+ * once the user opens/refreshes an AllTrails tab).
  */
-export async function resolveAuth(): Promise<ResolvedAuth> {
-  // ── Path 1: env-var credentials (unchanged from pre-fetchproxy behavior).
-  const username = readEnv('OFW_USERNAME');
-  const password = readEnv('OFW_PASSWORD');
-  if (username && password) {
-    const { token, expiresAt } = await loginWithPassword(username, password);
-    return { token, expiresAt, source: 'env' };
+export async function resolveAuth(): Promise<AllTrailsSession> {
+  // ── Path 1: env cookie escape hatch.
+  const envCookie = readEnvVar('ALLTRAILS_COOKIE');
+  if (envCookie) {
+    return { cookieHeader: envCookie, source: 'env' };
   }
 
-  // ── Path 2: fetchproxy fallback (new).
+  // ── Path 2: fetchproxy fallback (primary path).
   if (!fetchproxyDisabled()) {
     try {
       const session = await bootstrap({
         serverName: pkg.name,
         version: pkg.version,
-        // OFW serves both ofw.ourfamilywizard.com and www.ourfamilywizard.com;
-        // the API + auth token live on the apex. The extension matches on
-        // suffix, so listing the apex covers both.
-        domains: ['ourfamilywizard.com'],
+        // 'alltrails.com' matches www.alltrails.com (the extension treats each
+        // domain as "exact host or any subdomain of it").
+        domains: ['alltrails.com'],
         declare: {
           cookies: [],
-          // The web app stores the Bearer token in localStorage["auth"] and
-          // its expiry (ISO string) in localStorage["tokenExpiry"]. Mirroring
-          // both means our 401-replay logic can be slightly smarter, and the
-          // expiry surfaces correctly in diagnostics.
-          localStorage: ['auth', 'tokenExpiry'],
+          localStorage: [],
           sessionStorage: [],
-          captureHeaders: [],
+          // Snapshot the exact request headers the signed-in web app sends to
+          // its own API. The `cookie` header carries the fresh datadome + login
+          // session; `x-at-key` gives us the live app key in case it rotated.
+          captureHeaders: [
+            { host: 'www.alltrails.com', path: '/api/alltrails/*', headerName: 'cookie' },
+            { host: 'www.alltrails.com', path: '/api/alltrails/*', headerName: 'x-at-key' },
+          ],
+        },
+        onWaiting: (hint) => {
+          console.error(
+            `[alltrails-mcp] Waiting on the browser: ${hint}. Open or refresh a page on ` +
+              'www.alltrails.com (while signed in, with the fetchproxy extension installed) ' +
+              'so the extension can capture an authenticated API request.',
+          );
         },
       });
 
-      const token = session.localStorage['auth'];
-      const expiryRaw = session.localStorage['tokenExpiry'];
-      if (!token) {
+      const cookieHeader = session.capturedHeaders['cookie'];
+      const apiKey = session.capturedHeaders['x-at-key'];
+      if (!cookieHeader) {
         throw new Error(
-          'localStorage["auth"] missing on ourfamilywizard.com. ' +
-            'Sign into OFW in your browser (with the fetchproxy extension installed) and retry.',
+          'no authenticated request to www.alltrails.com/api/alltrails was captured. ' +
+            'Sign into alltrails.com in your browser (with the fetchproxy extension installed), ' +
+            'open a trail page so the app makes an API call, and retry.',
         );
       }
-      return {
-        token,
-        expiresAt: expiryRaw ? new Date(expiryRaw) : undefined,
-        source: 'fetchproxy',
-      };
+      return { cookieHeader, apiKey: apiKey || undefined, source: 'fetchproxy' };
     } catch (e) {
-      // FetchproxyBridgeDownError only escapes bootstrap() after the lazy-revive retry fails — surface .hint verbatim (actionable "click toolbar icon" copy).
+      // FetchproxyBridgeDownError only escapes bootstrap() after the lazy-revive
+      // retry fails — surface .hint verbatim (actionable "click toolbar icon" copy).
       if (classifyBridgeError(e) === 'bridge_down') {
         const downErr = e as FetchproxyBridgeDownError;
         throw new Error(
-          `OFW auth: fetchproxy bridge is down (extension service worker unreachable after retry). ${downErr.hint}`,
+          `AllTrails auth: fetchproxy bridge is down (extension service worker unreachable after retry). ${downErr.hint}`,
         );
       }
       const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(
-        `OFW auth: no OFW_USERNAME/OFW_PASSWORD set, and fetchproxy fallback failed: ${msg}`,
-      );
+      throw new Error(`AllTrails auth: ALLTRAILS_COOKIE not set, and fetchproxy fallback failed: ${msg}`);
     }
   }
 
-  // ── Path 3: nothing configured. Surface both fixes side-by-side so the
-  //    user can pick whichever fits their setup.
-  throw new Error(
-    'OFW auth: set OFW_USERNAME + OFW_PASSWORD, ' +
-      'or install the fetchproxy extension and sign into ourfamilywizard.com ' +
-      '(unset OFW_DISABLE_FETCHPROXY if it is set).',
+  // ── Path 3: nothing configured. Permanent — surface both fixes side-by-side.
+  throw new AllTrailsConfigError(
+    'AllTrails auth: set ALLTRAILS_COOKIE to a Cookie header from a signed-in alltrails.com ' +
+      'session, or install the fetchproxy extension and sign into alltrails.com ' +
+      '(unset ALLTRAILS_DISABLE_FETCHPROXY if it is set).',
   );
 }

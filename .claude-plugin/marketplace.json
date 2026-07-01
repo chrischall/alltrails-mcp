@@ -5,28 +5,28 @@
     "email": "chris.c.hall@gmail.com"
   },
   "metadata": {
-    "description": "OurFamilyWizard tools for Claude Code",
-    "version": "2.4.3"
+    "description": "AllTrails tools for Claude Code",
+    "version": "0.1.0"
   },
   "plugins": [
     {
-      "name": "ofw",
-      "displayName": "OurFamilyWizard",
+      "name": "alltrails",
+      "displayName": "AllTrails",
       "source": "./",
-      "description": "OurFamilyWizard co-parenting tools for Claude — messages, calendar, expenses, and journal via MCP",
-      "version": "2.4.3",
+      "description": "Unofficial AllTrails tools for Claude — search trails, get details, reviews, photos, and saved lists via MCP",
+      "version": "0.1.0",
       "author": {
         "name": "Chris Chall"
       },
-      "homepage": "https://github.com/chrischall/ofw-mcp",
-      "repository": "https://github.com/chrischall/ofw-mcp",
+      "homepage": "https://github.com/chrischall/alltrails-mcp",
+      "repository": "https://github.com/chrischall/alltrails-mcp",
       "license": "MIT",
       "keywords": [
-        "ofw",
-        "coparenting",
-        "ourFamilyWizard",
+        "alltrails",
+        "trails",
+        "hiking",
         "mcp",
-        "family"
+        "outdoors"
       ],
       "category": "productivity"
     }

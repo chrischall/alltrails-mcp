@@ -1,37 +1,37 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.chrischall/ofw-mcp",
-  "description": "OurFamilyWizard co-parenting for Claude — messages, calendar, expenses, and journal",
+  "name": "io.github.chrischall/alltrails-mcp",
+  "description": "Unofficial AllTrails MCP for Claude — search trails, get details, reviews, photos, saved lists",
   "repository": {
-    "url": "https://github.com/chrischall/ofw-mcp",
+    "url": "https://github.com/chrischall/alltrails-mcp",
     "source": "github"
   },
-  "version": "2.4.3",
+  "version": "0.1.0",
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "ofw-mcp",
-      "version": "2.4.3",
+      "identifier": "alltrails-mcp",
+      "version": "0.1.0",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
-          "name": "OFW_USERNAME",
-          "description": "Your OurFamilyWizard login email address. Optional — if omitted, the server falls back to the fetchproxy browser extension (requires being signed in to ourfamilywizard.com).",
-          "isRequired": false,
-          "format": "string"
-        },
-        {
-          "name": "OFW_PASSWORD",
-          "description": "Your OurFamilyWizard password. Optional — see OFW_USERNAME.",
+          "name": "ALLTRAILS_COOKIE",
+          "description": "A Cookie header from a signed-in alltrails.com browser session (must include the datadome cookie). Optional — if omitted, the server falls back to the fetchproxy browser extension (requires being signed in to alltrails.com).",
           "isRequired": false,
           "format": "string",
           "isSecret": true
         },
         {
-          "name": "OFW_WRITE_MODE",
-          "description": "Write-tool gate: \"none\" registers no write tools; \"drafts\" registers draft-level writes only (save/delete drafts, upload attachments); \"all\" registers everything (default). Unrecognized values fail closed to \"none\".",
+          "name": "ALLTRAILS_USER_ID",
+          "description": "Optional numeric AllTrails user id for the per-user tools (saved lists, completed trails, feed). If omitted, those tools resolve the signed-in user via /api/alltrails/me.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "ALLTRAILS_API_KEY",
+          "description": "Optional override for the embedded x-at-key app key, in case AllTrails rotates it. Normally unnecessary.",
           "isRequired": false,
           "format": "string"
         }
