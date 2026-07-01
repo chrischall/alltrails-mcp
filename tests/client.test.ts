@@ -86,6 +86,15 @@ describe('AllTrailsClient', () => {
     expect(result).toBeNull();
   });
 
+  it('throws an actionable error when a 2xx body is not JSON (DataDome interstitial)', async () => {
+    mockFetch([{ status: 200, text: '<html><body>Please verify you are human</body></html>' }]);
+    const client = new AllTrailsClient();
+    const err = await client.request('GET', '/api/alltrails/x').catch((e) => e as Error);
+    expect(err.message).toContain('non-JSON for GET /api/alltrails/x');
+    expect(err.message).toContain('DataDome');
+    expect(err.message).toContain('<html><body>Please verify');
+  });
+
   it('single-flights login and reuses the session across requests', async () => {
     const spy = vi.spyOn(auth, 'resolveAuth');
     mockFetch([{ status: 200, body: {} }, { status: 200, body: {} }]);

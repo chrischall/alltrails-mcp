@@ -51,7 +51,17 @@ export class AllTrailsClient {
     if (debugLogEnabled()) {
       console.error(`[alltrails-debug] response body: ${text || '<empty>'}`);
     }
-    return (text ? JSON.parse(text) : null) as T;
+    if (!text) return null as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      // A 2xx that isn't JSON is almost always a DataDome interstitial or an
+      // HTML error page — surface that instead of a bare SyntaxError.
+      throw new Error(
+        `AllTrails returned non-JSON for ${method} ${path} — likely a DataDome bot challenge or an HTML ` +
+          `error page. Refresh a signed-in alltrails.com tab and retry. Body starts: ${text.slice(0, 120)}`,
+      );
+    }
   }
 
   // Authenticated fetch. The 401/403 re-capture + one replay is delegated to
