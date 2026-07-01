@@ -53,6 +53,27 @@ describe('alltrails_get_trail_reviews', () => {
     await handlers.get('alltrails_get_trail_reviews')!({ trailId: '5', limit: 3 });
     expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/v2/trails/5/reviews/search', { limit: 3 });
   });
+
+  it('returns a compact projection when compact=true', async () => {
+    const { handlers } = setup({
+      trail_reviews: [
+        { user: { name: 'Pat' }, rating: 5, comment: 'Great', extra: 'dropped' },
+        { rating: 3 },
+      ],
+    });
+    const result = await handlers.get('alltrails_get_trail_reviews')!({ trailId: '5', compact: true });
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      count: 2,
+      reviews: [{ user: 'Pat', rating: 5, comment: 'Great' }, { rating: 3 }],
+    });
+  });
+
+  it('falls back to raw when compact=true but the reviews shape drifted', async () => {
+    const raw = { data: [] }; // no trail_reviews array
+    const { handlers } = setup(raw);
+    const result = await handlers.get('alltrails_get_trail_reviews')!({ trailId: '5', compact: true });
+    expect(JSON.parse(result.content[0].text)).toEqual(raw);
+  });
 });
 
 describe('alltrails_get_trail_photos', () => {

@@ -104,6 +104,31 @@ export function summarizeTrail(raw: RawTrail): TrailSummary {
   };
 }
 
+// A single review from `POST /v2/trails/{id}/reviews/search`. Loose — only the
+// fields the compact projection reads are named.
+const RawReviewSchema = z.looseObject({
+  user: z.looseObject({ name: z.string().optional() }).optional(),
+  rating: z.union([z.number(), z.string()]).optional(),
+  comment: z.string().optional(),
+});
+
+// Reviews envelope: the endpoint wraps results in `{ trail_reviews: [...] }`.
+export const ReviewListSchema = z.looseObject({
+  trail_reviews: z.array(RawReviewSchema).optional(),
+});
+
+/** A compact projection of a trail review. */
+export interface ReviewSummary {
+  user?: string;
+  rating?: number | string;
+  comment?: string;
+}
+
+/** Project a raw review into a {@link ReviewSummary}. Undefined fields are dropped by JSON.stringify. */
+export function summarizeReview(raw: z.infer<typeof RawReviewSchema>): ReviewSummary {
+  return { user: raw.user?.name, rating: raw.rating, comment: raw.comment };
+}
+
 /**
  * GET a trail-listing endpoint and return the tool result. Validates the
  * envelope (lenient — drift warns to stderr, never throws). When `compact` is

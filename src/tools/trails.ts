@@ -1,7 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
-import { jsonResponse } from './_shared.js';
+import { jsonResponse, ReviewListSchema, summarizeReview } from './_shared.js';
+import { parseAllTrails } from '../validate.js';
 
 // Trail-scoped read tools: detail, reviews, photos, weather. All read-only.
 export function registerTrailTools(server: McpServer, client: AllTrailsClient): void {
@@ -27,19 +28,27 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   });
 
   server.registerTool('alltrails_get_trail_reviews', {
-    description: 'Get user reviews for an AllTrails trail by its numeric trail id.',
+    description:
+      'Get user reviews for an AllTrails trail by its numeric trail id. Set compact=true to return just ' +
+      '{ user, rating, comment } per review.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       trailId: z.string().describe('Numeric AllTrails trail id'),
       limit: z.number().int().positive().describe('Max reviews to return (default 20)').optional(),
+      compact: z.boolean().describe('Return a slim { user, rating, comment } per review (default false)').optional(),
     },
   }, async (args) => {
-    const data = await client.request(
+    const raw = await client.request(
       'POST',
       `/api/alltrails/v2/trails/${encodeURIComponent(args.trailId)}/reviews/search`,
       { limit: args.limit ?? 20 },
     );
-    return jsonResponse(data);
+    const parsed = parseAllTrails(ReviewListSchema, raw, 'POST /api/alltrails/v2/trails/{id}/reviews/search');
+    if (args.compact && Array.isArray(parsed.trail_reviews)) {
+      const reviews = parsed.trail_reviews.map(summarizeReview);
+      return jsonResponse({ count: reviews.length, reviews });
+    }
+    return jsonResponse(raw);
   });
 
   server.registerTool('alltrails_get_trail_photos', {

@@ -45,7 +45,7 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
 | Tool | Notes |
 |------|-------|
 | `alltrails_get_trail(trailId, detail?)` | Trail details. `detail`: `basic` \| `medium` (default) \| `offline` (includes route geometry). |
-| `alltrails_get_trail_reviews(trailId, limit?)` | User reviews (default limit 20). |
+| `alltrails_get_trail_reviews(trailId, limit?, compact?)` | User reviews (default limit 20). `compact=true` returns just `{ user, rating, comment }` per review. |
 | `alltrails_get_trail_photos(trailId)` | Trail photos. |
 | `alltrails_get_trail_weather(trailId)` | Weather overview for the trail. |
 
