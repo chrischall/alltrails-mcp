@@ -1,7 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
-import { fetchTrailListing, jsonResponse } from './_shared.js';
+import { parseAllTrails } from '../validate.js';
+import { fetchTrailListing, jsonResponse, SearchResponseSchema, summarizeSearchResult } from './_shared.js';
 
 // Discovery tools: full-text/geographic search plus bulk listing by
 // state/country. All read-only.
@@ -9,22 +10,38 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
   server.registerTool('alltrails_search', {
     description:
       'Search AllTrails for trails. Provide a free-text query (place or trail name) and/or a lat/lng to ' +
-      'bias results geographically. Note: this hits AllTrails\' internal explore endpoint; the exact ' +
-      'response shape is undocumented and may change.',
+      'bias results geographically. The endpoint can return hundreds of results regardless of limit, so ' +
+      'set compact=true (strongly recommended) for slim summaries truncated to the limit client-side. ' +
+      'Note: this hits AllTrails\' internal explore endpoint; the exact response shape is undocumented ' +
+      'and may change.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       query: z.string().describe('Free-text search, e.g. "waterfall trails near Portland"').optional(),
       lat: z.number().describe('Latitude to bias results toward').optional(),
       lng: z.number().describe('Longitude to bias results toward').optional(),
       limit: z.number().int().positive().describe('Max results to return (default 20)').optional(),
+      compact: z
+        .boolean()
+        .describe('Return slim per-trail summaries capped at limit instead of the full records (default false)')
+        .optional(),
     },
   }, async (args) => {
-    const body: Record<string, unknown> = { limit: args.limit ?? 20 };
+    const limit = args.limit ?? 20;
+    const body: Record<string, unknown> = { limit };
     if (args.query !== undefined) body.q = args.query;
     if (args.lat !== undefined) body.lat = args.lat;
     if (args.lng !== undefined) body.lng = args.lng;
-    const data = await client.request('POST', '/api/alltrails/explore/v1/search', body);
-    return jsonResponse(data);
+    const raw = await client.request('POST', '/api/alltrails/explore/v1/search', body);
+    if (args.compact) {
+      const parsed = parseAllTrails(SearchResponseSchema, raw, 'POST /api/alltrails/explore/v1/search');
+      if (Array.isArray(parsed.searchResults)) {
+        // The live endpoint ignores the body limit (captured 2026-07-02: 500
+        // results for limit=5), so compact mode truncates locally.
+        const results = parsed.searchResults.slice(0, limit).map(summarizeSearchResult);
+        return jsonResponse({ totalCount: parsed.summary?.count ?? undefined, count: results.length, results });
+      }
+    }
+    return jsonResponse(raw);
   });
 
   server.registerTool('alltrails_list_trails_by_state', {

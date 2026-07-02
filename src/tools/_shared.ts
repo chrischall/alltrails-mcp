@@ -1,7 +1,8 @@
 import { rawTextResult, textResult } from '@chrischall/mcp-utils';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
-import { getConfiguredUserId } from '../config.js';
+import { getApiKey, getConfiguredUserId } from '../config.js';
+import { BASE_URL } from '../protocol.js';
 import { parseAllTrails } from '../validate.js';
 
 // Pretty-printed JSON tool result. Thin wrapper over @chrischall/mcp-utils'
@@ -12,8 +13,11 @@ export const jsonResponse = textResult;
 export const textResponse = rawTextResult;
 
 // `GET /api/alltrails/me` returns the signed-in user; we only read the id.
+// The live endpoint wraps it as `{ users: [{ id, ... }] }` (captured
+// 2026-07-02); the `user`/top-level variants are kept as drift tolerance.
 // Loose: every other field passes through untouched.
 const MeSchema = z.looseObject({
+  users: z.array(z.looseObject({ id: z.union([z.number(), z.string()]).optional() })).optional(),
   user: z.looseObject({ id: z.union([z.number(), z.string()]).optional() }).optional(),
   id: z.union([z.number(), z.string()]).optional(),
 });
@@ -31,7 +35,7 @@ export async function resolveUserId(client: AllTrailsClient, provided?: string):
   const explicit = provided?.trim() || getConfiguredUserId();
   if (explicit) return explicit;
   const me = parseAllTrails(MeSchema, await client.request('GET', '/api/alltrails/me'), 'GET /api/alltrails/me');
-  const id = me?.user?.id ?? me?.id;
+  const id = me?.users?.[0]?.id ?? me?.user?.id ?? me?.id;
   if (id === undefined || id === null || `${id}`.length === 0) {
     throw new Error(
       'Could not determine your AllTrails user id from /api/alltrails/me — you may not be signed in. ' +
@@ -195,6 +199,243 @@ export interface ReviewSummary {
 /** Project a raw review into a {@link ReviewSummary}. Undefined fields are dropped by JSON.stringify. */
 export function summarizeReview(raw: z.infer<typeof RawReviewSchema>): ReviewSummary {
   return { user: raw.user?.name, rating: raw.rating, comment: raw.comment };
+}
+
+/** Drop an object entirely when every one of its values is undefined. */
+function prune<T extends Record<string, unknown>>(obj: T): T | undefined {
+  return Object.values(obj).some((v) => v !== undefined) ? obj : undefined;
+}
+
+/** Strip HTML tags (the feed wraps trail names in anchors) and collapse whitespace. */
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/** Return a trimmed string, or undefined when it is null/empty/whitespace. */
+function nonEmpty(s: string | null | undefined): string | undefined {
+  const t = s?.trim();
+  return t ? t : undefined;
+}
+
+// A single photo from `GET /v2/trails/{id}/photos` (captured 2026-07-02).
+// Loose + nullish — the live records carry explicit nulls for empty fields.
+const RawPhotoSchema = z.looseObject({
+  id: z.union([z.number(), z.string()]).optional(),
+  title: z.string().nullish(),
+  description: z.string().nullish(),
+  likeCount: z.number().nullish(),
+  location: z
+    .looseObject({ latitude: z.number().nullish(), longitude: z.number().nullish() })
+    .nullish(),
+  user: z.looseObject({ firstName: z.string().nullish(), lastName: z.string().nullish() }).nullish(),
+  metadata: z.looseObject({ created: z.string().nullish() }).nullish(),
+});
+type RawPhoto = z.infer<typeof RawPhotoSchema>;
+
+// Photos envelope: `{ photos: [...] }`.
+export const PhotoListSchema = z.looseObject({
+  photos: z.array(RawPhotoSchema).optional(),
+});
+
+/** A compact projection of a trail photo. */
+export interface PhotoSummary {
+  id?: string;
+  title?: string;
+  description?: string;
+  likeCount?: number;
+  /** Uploader's display name. */
+  user?: string;
+  uploadedAt?: string;
+  latitude?: number;
+  longitude?: number;
+  /** Fetchable image URL — 302s to the CDN original. Carries the anonymous app key. */
+  url?: string;
+}
+
+/**
+ * Project a raw photo into a {@link PhotoSummary}. The photo records carry no
+ * direct image URL; `GET /api/alltrails/photos/{id}/image?size=large&key=…`
+ * (verified 2026-07-02) 302s to the CDN image and is not bot-walled, so the
+ * summary derives that URL. `key` is the anonymous embedded app key (or the
+ * ALLTRAILS_API_KEY override), not a user secret.
+ */
+export function summarizePhoto(raw: RawPhoto): PhotoSummary {
+  const user = [nonEmpty(raw.user?.firstName), nonEmpty(raw.user?.lastName)].filter(Boolean).join(' ');
+  return {
+    id: raw.id === undefined ? undefined : `${raw.id}`,
+    title: nonEmpty(raw.title),
+    description: nonEmpty(raw.description),
+    likeCount: raw.likeCount ?? undefined,
+    user: user || undefined,
+    uploadedAt: raw.metadata?.created ?? undefined,
+    latitude: raw.location?.latitude ?? undefined,
+    longitude: raw.location?.longitude ?? undefined,
+    url:
+      raw.id === undefined
+        ? undefined
+        : `${BASE_URL}/api/alltrails/photos/${raw.id}/image?size=large&key=${getApiKey()}`,
+  };
+}
+
+// A single result from `POST /explore/v1/search` (captured 2026-07-02). The
+// records are Algolia-formatted like the listings, so RawTrailSchema covers the
+// shared fields; only the search-specific extras are added here.
+const RawSearchResultSchema = RawTrailSchema.extend({
+  type: z.string().nullish(),
+  city_name: z.string().nullish(),
+  country_name: z.string().nullish(),
+  duration_minutes: z.number().nullish(),
+  is_closed: z.boolean().nullish(),
+});
+type RawSearchResult = z.infer<typeof RawSearchResultSchema>;
+
+// Search envelope: `{ summary: { count }, searchResults: [...] }`.
+export const SearchResponseSchema = z.looseObject({
+  summary: z.looseObject({ count: z.number().nullish() }).nullish(),
+  searchResults: z.array(RawSearchResultSchema).optional(),
+});
+
+/** {@link TrailSummary} plus the search-only fields. */
+export interface SearchResultSummary extends TrailSummary {
+  type?: string;
+  city?: string;
+  country?: string;
+  durationMinutes?: number;
+  closed?: boolean;
+}
+
+/**
+ * Project a raw search result. Unlike the listings, search's `objectID` is the
+ * prefixed `"trail-{id}"` variant, so the numeric `ID` is preferred for the id.
+ */
+export function summarizeSearchResult(raw: RawSearchResult): SearchResultSummary {
+  const id = raw.ID ?? raw.id ?? raw.objectID;
+  return {
+    ...summarizeTrail(raw),
+    id: id === undefined ? undefined : `${id}`,
+    type: raw.type ?? undefined,
+    city: raw.city_name ?? undefined,
+    country: raw.country_name ?? undefined,
+    durationMinutes: raw.duration_minutes ?? undefined,
+    closed: raw.is_closed ?? undefined,
+  };
+}
+
+// The itemData of a `feed-item` section from `GET .../feeds/{name}` (captured
+// 2026-07-02). Only the projected fields are named; loose as always.
+const RawFeedItemDataSchema = z.looseObject({
+  itemType: z.string().nullish(),
+  timestamp: z.string().nullish(),
+  description: z.string().nullish(),
+  user: z.looseObject({ firstName: z.string().nullish(), lastName: z.string().nullish() }).nullish(),
+  trail: z
+    .looseObject({
+      id: z.union([z.number(), z.string()]).optional(),
+      name: z.string().nullish(),
+      slug: z.string().nullish(),
+    })
+    .nullish(),
+  activity: z
+    .looseObject({
+      name: z.string().nullish(),
+      rating: z.union([z.number(), z.string()]).nullish(),
+      activity: z.looseObject({ name: z.string().nullish() }).nullish(),
+      summaryStats: z
+        .looseObject({
+          distanceTotal: z.number().nullish(),
+          duration: z.number().nullish(),
+          elevationGain: z.number().nullish(),
+        })
+        .nullish(),
+    })
+    .nullish(),
+  review: z
+    .looseObject({
+      rating: z.union([z.number(), z.string()]).nullish(),
+      comment: z.string().nullish(),
+    })
+    .nullish(),
+});
+type RawFeedItemData = z.infer<typeof RawFeedItemDataSchema>;
+
+// Feed page envelope: `{ sections: [{ section_type, itemData }], pageInfo }`.
+export const FeedPageSchema = z.looseObject({
+  sections: z
+    .array(z.looseObject({ section_type: z.string().nullish(), itemData: RawFeedItemDataSchema.nullish() }))
+    .optional(),
+  pageInfo: z
+    .looseObject({ hasNextPage: z.boolean().nullish(), nextCursor: z.string().nullish() })
+    .nullish(),
+});
+
+// Feed directory envelope (`GET .../feeds` with no feed name): the available
+// feeds, not the activity items themselves.
+export const FeedDirectorySchema = z.looseObject({
+  feeds: z
+    .array(z.looseObject({ name: z.string().nullish(), displayName: z.string().nullish() }))
+    .optional(),
+  initialFeedHint: z.string().nullish(),
+});
+
+/** A compact projection of one activity-feed item. */
+export interface FeedItemSummary {
+  type?: string;
+  timestamp?: string;
+  /** HTML-stripped human description, e.g. "Hiked North Mountain National Trail". */
+  description?: string;
+  /** Actor's display name. */
+  user?: string;
+  trail?: { id?: string; name?: string; slug?: string };
+  activity?: {
+    /** Activity kind, e.g. "Hiking". */
+    type?: string;
+    name?: string;
+    rating?: number | string;
+    distanceMeters?: number;
+    distanceMiles?: number;
+    durationMinutes?: number;
+    elevationGainMeters?: number;
+    elevationGainFeet?: number;
+  };
+  review?: { rating?: number | string; comment?: string };
+}
+
+/** Project a feed item's itemData into a {@link FeedItemSummary}. */
+export function summarizeFeedItem(raw: RawFeedItemData): FeedItemSummary {
+  const user = [nonEmpty(raw.user?.firstName), nonEmpty(raw.user?.lastName)].filter(Boolean).join(' ');
+  const trail = raw.trail
+    ? prune({
+        id: raw.trail.id === undefined ? undefined : `${raw.trail.id}`,
+        name: raw.trail.name ?? undefined,
+        slug: raw.trail.slug ?? undefined,
+      })
+    : undefined;
+  const stats = raw.activity?.summaryStats;
+  const activity = raw.activity
+    ? prune({
+        type: raw.activity.activity?.name ?? undefined,
+        name: raw.activity.name ?? undefined,
+        rating: raw.activity.rating ?? undefined,
+        distanceMeters: stats?.distanceTotal ?? undefined,
+        distanceMiles: metersToMiles(stats?.distanceTotal ?? undefined),
+        // `duration` is already minutes (timeTotal/timeMoving are seconds).
+        durationMinutes: stats?.duration ?? undefined,
+        elevationGainMeters: stats?.elevationGain ?? undefined,
+        elevationGainFeet: metersToFeet(stats?.elevationGain ?? undefined),
+      })
+    : undefined;
+  const review = raw.review
+    ? prune({ rating: raw.review.rating ?? undefined, comment: nonEmpty(raw.review.comment) })
+    : undefined;
+  return {
+    type: raw.itemType ?? undefined,
+    timestamp: raw.timestamp ?? undefined,
+    description: raw.description ? nonEmpty(stripHtml(raw.description)) : undefined,
+    user: user || undefined,
+    trail,
+    activity,
+    review,
+  };
 }
 
 /**

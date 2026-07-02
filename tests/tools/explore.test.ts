@@ -47,6 +47,44 @@ describe('alltrails_search', () => {
       lng: 0,
     });
   });
+
+  it('compact=true projects searchResults and enforces the limit client-side', async () => {
+    // The live endpoint ignores the body limit (500 results for limit=5), so
+    // compact mode truncates locally.
+    const { handlers } = setup({
+      summary: { count: 500, displayText: '500+ trails' },
+      searchResults: [
+        { ID: 1, objectID: 'trail-1', type: 'trail', name: 'A', length: 1609.344, city_name: 'LA' },
+        { ID: 2, objectID: 'trail-2', type: 'trail', name: 'B' },
+        { ID: 3, objectID: 'trail-3', type: 'trail', name: 'C' },
+      ],
+    });
+    const result = await handlers.get('alltrails_search')!({ query: 'park', limit: 2, compact: true });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.totalCount).toBe(500);
+    expect(parsed.count).toBe(2);
+    expect(parsed.results).toHaveLength(2);
+    expect(parsed.results[0]).toEqual({
+      id: '1', type: 'trail', name: 'A', lengthMeters: 1609.344, lengthMiles: 1, city: 'LA',
+    });
+  });
+
+  it('compact=true omits totalCount when the summary block is absent', async () => {
+    const { handlers } = setup({ searchResults: [{ ID: 1, name: 'A' }] });
+    const result = await handlers.get('alltrails_search')!({ compact: true });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.totalCount).toBeUndefined();
+    expect(parsed.count).toBe(1);
+  });
+
+  it('compact=true falls back to raw when the search shape drifted', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const drifted = { searchResults: 'nope' };
+    const { handlers } = setup(drifted);
+    const result = await handlers.get('alltrails_search')!({ compact: true });
+    expect(JSON.parse(result.content[0].text)).toEqual(drifted);
+    expect(errSpy).toHaveBeenCalled();
+  });
 });
 
 describe('alltrails_list_trails_by_state', () => {

@@ -1,7 +1,15 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
-import { jsonResponse, ReviewListSchema, summarizeReview, TrailDetailSchema, summarizeTrailDetail } from './_shared.js';
+import {
+  jsonResponse,
+  PhotoListSchema,
+  ReviewListSchema,
+  summarizePhoto,
+  summarizeReview,
+  TrailDetailSchema,
+  summarizeTrailDetail,
+} from './_shared.js';
 import { parseAllTrails } from '../validate.js';
 
 // Trail-scoped read tools: detail, reviews, photos, weather. All read-only.
@@ -64,14 +72,24 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   });
 
   server.registerTool('alltrails_get_trail_photos', {
-    description: 'Get photos for an AllTrails trail by its numeric trail id.',
+    description:
+      'Get photos for an AllTrails trail by its numeric trail id. Set compact=true to return just ' +
+      '{ id, title, likeCount, user, uploadedAt, url } per photo — the url serves the actual image.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       trailId: z.string().describe('Numeric AllTrails trail id'),
+      compact: z.boolean().describe('Return a slim projection per photo (default false)').optional(),
     },
   }, async (args) => {
-    const data = await client.request('GET', `/api/alltrails/v2/trails/${encodeURIComponent(args.trailId)}/photos`);
-    return jsonResponse(data);
+    const raw = await client.request('GET', `/api/alltrails/v2/trails/${encodeURIComponent(args.trailId)}/photos`);
+    if (args.compact) {
+      const parsed = parseAllTrails(PhotoListSchema, raw, 'GET /api/alltrails/v2/trails/{id}/photos');
+      if (Array.isArray(parsed.photos)) {
+        const photos = parsed.photos.map(summarizePhoto);
+        return jsonResponse({ count: photos.length, photos });
+      }
+    }
+    return jsonResponse(raw);
   });
 
   server.registerTool('alltrails_get_trail_weather', {

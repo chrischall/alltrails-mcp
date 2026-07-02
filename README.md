@@ -112,17 +112,17 @@ All tools are **read-only** — this server never writes to AllTrails.
 
 | Tool | What it does |
 |------|-------------|
-| `alltrails_search` | Search trails by text and/or lat/lng |
+| `alltrails_search` | Search trails by text and/or lat/lng (`compact` strongly recommended — the endpoint ignores `limit`, compact truncates client-side) |
 | `alltrails_list_trails_by_state` | Paginated listing of trails in a state/region (`compact` for slim summaries) |
 | `alltrails_list_trails_by_country` | Paginated listing of trails in a country, e.g. `313` = US (`compact` supported) |
 | `alltrails_get_trail` | Trail details (`detail`: `basic`/`medium`/`offline`; `compact` for a slim projection) |
 | `alltrails_get_trail_reviews` | User reviews for a trail (`compact` for `{user, rating, comment}`) |
-| `alltrails_get_trail_photos` | Photos for a trail |
+| `alltrails_get_trail_photos` | Photos for a trail (`compact` for slim records with a fetchable image `url`) |
 | `alltrails_get_trail_weather` | Weather overview for a trail |
 | `alltrails_get_profile` | The signed-in user's profile |
 | `alltrails_list_user_lists` | A user's saved lists / favorites |
 | `alltrails_list_completed_trails` | A user's completed trails |
-| `alltrails_get_activity_feed` | A user's activity feed |
+| `alltrails_get_activity_feed` | A user's activity feed (`feed`: `local`/`timeline`/`personal` for the items, omit for the directory; `cursor` paginates; `compact` for slim items) |
 
 The per-user tools default to the signed-in user (resolved via `/api/alltrails/me` or `ALLTRAILS_USER_ID`); pass `userId` to target a public profile.
 

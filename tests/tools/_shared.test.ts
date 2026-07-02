@@ -1,11 +1,15 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { AllTrailsClient } from '../../src/client.js';
+import { DEFAULT_ALLTRAILS_API_KEY } from '../../src/protocol.js';
 import {
   jsonResponse,
   textResponse,
   resolveUserId,
   summarizeTrail,
   summarizeTrailDetail,
+  summarizePhoto,
+  summarizeSearchResult,
+  summarizeFeedItem,
   fetchTrailListing,
 } from '../../src/tools/_shared.js';
 
@@ -60,8 +64,19 @@ describe('resolveUserId', () => {
     expect(await resolveUserId(c)).toBe('77');
   });
 
+  it('resolves via the users[] envelope the live /me actually returns', async () => {
+    // Captured 2026-07-02: GET /api/alltrails/me → { users: [{ id, ... }] }
+    const c = clientReturning({ users: [{ id: 12345678, username: 'some-hiker' }] });
+    expect(await resolveUserId(c)).toBe('12345678');
+  });
+
   it('throws an actionable error when /me yields no id (not signed in)', async () => {
     const c = clientReturning({});
+    await expect(resolveUserId(c)).rejects.toThrow(/Could not determine your AllTrails user id/);
+  });
+
+  it('throws when the users[] envelope is empty', async () => {
+    const c = clientReturning({ users: [] });
     await expect(resolveUserId(c)).rejects.toThrow(/Could not determine your AllTrails user id/);
   });
 });
@@ -150,6 +165,211 @@ describe('summarizeTrailDetail', () => {
   it('keeps location when at least one subfield is present', () => {
     const s = summarizeTrailDetail({ id: 1, location: { city: 'Moab' } });
     expect(s.location).toEqual({ city: 'Moab' });
+  });
+});
+
+describe('summarizePhoto', () => {
+  it('projects the captured photo shape, deriving a fetchable image url', () => {
+    // Captured 2026-07-02: GET /api/alltrails/v2/trails/{id}/photos → { photos: [...] }
+    expect(summarizePhoto({
+      id: 49001265,
+      title: 'Summit view',
+      description: null,
+      likeCount: 3,
+      photoHash: '3bb1d835d02a8e22989c0c813a2794ce',
+      trailId: 10236086,
+      location: { postalCode: null, city: null, latitude: 63.7424617, longitude: -148.9533833 },
+      user: { id: 23711569, firstName: 'Connie', lastName: 'Blade' },
+      metadata: { created: '2022-07-02T21:07:21Z', status: 'A' },
+    })).toEqual({
+      id: '49001265',
+      title: 'Summit view',
+      likeCount: 3,
+      user: 'Connie Blade',
+      uploadedAt: '2022-07-02T21:07:21Z',
+      latitude: 63.7424617,
+      longitude: -148.9533833,
+      url: `https://www.alltrails.com/api/alltrails/photos/49001265/image?size=large&key=${DEFAULT_ALLTRAILS_API_KEY}`,
+    });
+  });
+
+  it('drops empty title, null description, and omits the url when the id is missing', () => {
+    const s = summarizePhoto({ title: '', description: null });
+    expect(s.title).toBeUndefined();
+    expect(s.description).toBeUndefined();
+    expect(s.url).toBeUndefined();
+    expect(JSON.stringify(s)).toBe('{}');
+  });
+
+  it('keeps a non-empty description and a single-name user', () => {
+    const s = summarizePhoto({ id: '5', description: 'Great falls', user: { firstName: 'Ana' } });
+    expect(s.description).toBe('Great falls');
+    expect(s.user).toBe('Ana');
+  });
+
+  it('maps the explicit nulls the live payload carries to omitted fields', () => {
+    const s = summarizePhoto({
+      id: 9,
+      likeCount: null,
+      location: { latitude: null, longitude: null },
+      user: { firstName: null, lastName: null },
+      metadata: { created: null },
+    });
+    expect(s.likeCount).toBeUndefined();
+    expect(s.latitude).toBeUndefined();
+    expect(s.longitude).toBeUndefined();
+    expect(s.user).toBeUndefined();
+    expect(s.uploadedAt).toBeUndefined();
+  });
+});
+
+describe('summarizeSearchResult', () => {
+  it('prefers the numeric ID over the prefixed objectID and projects search extras', () => {
+    // Captured 2026-07-02: POST /api/alltrails/explore/v1/search → searchResults[]
+    expect(summarizeSearchResult({
+      ID: 10376954,
+      objectID: 'trail-10376954',
+      type: 'trail',
+      name: 'Los Angeles Historic Park',
+      slug: 'trail/us/california/los-angeles-historic-park',
+      length: 1770.274,
+      elevation_gain: 4.8768,
+      difficulty_rating: '1',
+      avg_rating: 4.6,
+      num_reviews: 591,
+      area_name: 'Los Angeles State Historic Park',
+      state_name: 'California',
+      city_name: 'Dodgertown',
+      country_name: 'United States',
+      duration_minutes: 20,
+      is_closed: false,
+      popularity: 93.8056,
+    })).toEqual({
+      id: '10376954',
+      type: 'trail',
+      name: 'Los Angeles Historic Park',
+      slug: 'trail/us/california/los-angeles-historic-park',
+      lengthMeters: 1770.274,
+      lengthMiles: 1.1,
+      elevationGainMeters: 4.8768,
+      elevationGainFeet: 16,
+      difficulty: '1',
+      rating: 4.6,
+      numReviews: 591,
+      area: 'Los Angeles State Historic Park',
+      region: 'California',
+      city: 'Dodgertown',
+      country: 'United States',
+      durationMinutes: 20,
+      closed: false,
+      popularity: 93.8056,
+    });
+  });
+
+  it('falls back to objectID when no numeric id variant is present', () => {
+    expect(summarizeSearchResult({ objectID: 'trail-42' }).id).toBe('trail-42');
+  });
+
+  it('maps null search extras (and a missing id) to omitted fields', () => {
+    const s = summarizeSearchResult({
+      type: null,
+      city_name: null,
+      country_name: null,
+      duration_minutes: null,
+      is_closed: null,
+    });
+    expect(s.id).toBeUndefined();
+    expect(s.type).toBeUndefined();
+    expect(s.city).toBeUndefined();
+    expect(s.country).toBeUndefined();
+    expect(s.durationMinutes).toBeUndefined();
+    expect(s.closed).toBeUndefined();
+  });
+});
+
+describe('summarizeFeedItem', () => {
+  // Captured 2026-07-02: GET .../feeds/{local|timeline|personal} →
+  // { sections: [{ section_type: 'feed-item', itemData: {...} }], pageInfo }
+  const capturedItemData = {
+    itemID: '11265880-70a0-11f1-8080-8000276183d4',
+    itemType: 'activity:created',
+    timestamp: '2026-06-25T13:38:58.000Z',
+    description:
+      'Hiked <a data-id="10305376" rel="alltrails:trail" href="/trail/us/arizona/north-mountain-national-trail--4">North Mountain National Trail</a>',
+    user: { id: 112285977, firstName: 'Jade', lastName: 'Sandoval', slug: 'jade-sandoval-4' },
+    trail: { id: 10305376, name: 'North Mountain National Trail', slug: 'us/arizona/north-mountain-national-trail--4' },
+    activity: {
+      id: 394302462,
+      name: 'Morning hike at North Mountain National Trail',
+      rating: 4,
+      activity: { uid: 'hiking', name: 'Hiking' },
+      summaryStats: {
+        calories: 299,
+        distanceTotal: 2485.81,
+        duration: 34,
+        elevationGain: 172,
+        elevationLoss: 167,
+        timeMoving: 2066,
+        timeTotal: 2066,
+      },
+    },
+    review: { id: 71319107, rating: 4, comment: '' },
+  };
+
+  it('projects the captured activity feed item, stripping html from the description', () => {
+    expect(summarizeFeedItem(capturedItemData)).toEqual({
+      type: 'activity:created',
+      timestamp: '2026-06-25T13:38:58.000Z',
+      description: 'Hiked North Mountain National Trail',
+      user: 'Jade Sandoval',
+      trail: { id: '10305376', name: 'North Mountain National Trail', slug: 'us/arizona/north-mountain-national-trail--4' },
+      activity: {
+        type: 'Hiking',
+        name: 'Morning hike at North Mountain National Trail',
+        rating: 4,
+        distanceMeters: 2485.81,
+        distanceMiles: 1.54,
+        durationMinutes: 34,
+        elevationGainMeters: 172,
+        elevationGainFeet: 564,
+      },
+      review: { rating: 4 },
+    });
+  });
+
+  it('drops empty nested objects instead of emitting {}', () => {
+    const s = summarizeFeedItem({ itemType: 'user:connected' });
+    expect(s).toEqual({ type: 'user:connected' });
+    expect(JSON.stringify(s)).toBe('{"type":"user:connected"}');
+  });
+
+  it('maps the explicit nulls the live payload carries to omitted fields', () => {
+    const s = summarizeFeedItem({
+      itemType: null,
+      timestamp: null,
+      description: null,
+      user: { firstName: null, lastName: null },
+      trail: { name: null, slug: null },
+      activity: {
+        name: null,
+        rating: null,
+        activity: { name: null },
+        summaryStats: { distanceTotal: null, duration: null, elevationGain: null },
+      },
+      review: { rating: null, comment: null },
+    });
+    expect(s).toEqual({});
+    expect(JSON.stringify(s)).toBe('{}');
+  });
+
+  it('keeps a review comment when present and tolerates a stats-less activity', () => {
+    const s = summarizeFeedItem({
+      itemType: 'review:created',
+      review: { rating: 5, comment: 'Lovely loop.' },
+      activity: { name: 'Afternoon walk' },
+    });
+    expect(s.review).toEqual({ rating: 5, comment: 'Lovely loop.' });
+    expect(s.activity).toEqual({ name: 'Afternoon walk' });
   });
 });
 
