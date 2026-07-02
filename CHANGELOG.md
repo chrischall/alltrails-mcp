@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0](https://github.com/chrischall/alltrails-mcp/compare/v0.2.0...v0.3.0) (2026-07-02)
+
+
+### Features
+
+* compact projections for photos, search, and activity feed (from live captures) ([#6](https://github.com/chrischall/alltrails-mcp/issues/6)) ([da6d7ae](https://github.com/chrischall/alltrails-mcp/commit/da6d7ae00fb2e5e481a44ca324d677a050bcb347))
+* GPX export tool built from offline-detail route geometry ([#10](https://github.com/chrischall/alltrails-mcp/issues/10)) ([9b987f2](https://github.com/chrischall/alltrails-mcp/commit/9b987f21a2923e1c960ea19ebbd75d5082af6d06))
+
+
+### Bug Fixes
+
+* encode photo image url params and decode html entities in feed descriptions ([#8](https://github.com/chrischall/alltrails-mcp/issues/8)) ([ffc940e](https://github.com/chrischall/alltrails-mcp/commit/ffc940ef50694640427f0ec79ce648a7dc8a87b5)), closes [#7](https://github.com/chrischall/alltrails-mcp/issues/7)
+* map GPX elevations by encoded point index; enable auto-merge in ruleset script ([#13](https://github.com/chrischall/alltrails-mcp/issues/13)) ([58ef6df](https://github.com/chrischall/alltrails-mcp/commit/58ef6df40fd6e69eadd5dd76283d52dbf1f9ceeb)), closes [#11](https://github.com/chrischall/alltrails-mcp/issues/11)
+* route free-text search through the explore suggestions endpoint ([#12](https://github.com/chrischall/alltrails-mcp/issues/12)) ([793f15b](https://github.com/chrischall/alltrails-mcp/commit/793f15b24418b4eb8ae079738cd91f9a4f310487))
+
 ## [0.2.0](https://github.com/chrischall/alltrails-mcp/compare/v0.1.0...v0.2.0) (2026-07-02)
 
 
