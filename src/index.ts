@@ -1,22 +1,9 @@
 #!/usr/bin/env node
-const originalEmit = process.emit.bind(process);
-type EmitFn = (event: string | symbol, ...args: unknown[]) => boolean;
-(process.emit as EmitFn) = function (event: string | symbol, ...args: unknown[]): boolean {
-  if (event === 'warning') {
-    const w = args[0] as { name?: string; message?: string } | undefined;
-    if (w?.name === 'ExperimentalWarning' && /SQLite/i.test(w.message ?? '')) {
-      return false;
-    }
-  }
-  return (originalEmit as EmitFn)(event, ...args);
-};
 import { runMcp } from '@chrischall/mcp-utils';
 import { client } from './client.js';
+import { registerTrailTools } from './tools/trails.js';
+import { registerExploreTools } from './tools/explore.js';
 import { registerUserTools } from './tools/user.js';
-import { registerMessageTools } from './tools/messages.js';
-import { registerCalendarTools } from './tools/calendar.js';
-import { registerExpenseTools } from './tools/expenses.js';
-import { registerJournalTools } from './tools/journal.js';
 
 // runMcp builds the McpServer, applies the registrars (with `client` threaded
 // through as deps), prints the banner to stderr, wires SIGINT/SIGTERM graceful
@@ -25,16 +12,11 @@ import { registerJournalTools } from './tools/journal.js';
 // resolved lazily on the first tool call), so the host's initial tools/list
 // always succeeds before any credential check runs.
 await runMcp({
-  name: 'ofw',
-  version: '2.4.3', // x-release-please-version
+  name: 'alltrails',
+  version: '0.1.0', // x-release-please-version
   deps: client,
-  tools: [
-    registerUserTools,
-    registerMessageTools,
-    registerCalendarTools,
-    registerExpenseTools,
-    registerJournalTools,
-  ],
+  tools: [registerTrailTools, registerExploreTools, registerUserTools],
   banner:
-    '[ofw-mcp] This project was developed and is maintained by AI (Claude Sonnet 4.6). Use at your own discretion.',
+    '[alltrails-mcp] Unofficial AllTrails MCP. AllTrails has no public API; this reverse-engineers ' +
+    'the internal one and may break or violate their ToS. Developed and maintained by AI (Claude). Use at your own discretion.',
 });

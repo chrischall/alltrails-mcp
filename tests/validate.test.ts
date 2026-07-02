@@ -1,43 +1,37 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { z } from 'zod';
-import { parseOFW } from '../src/validate.js';
-
-const Schema = z.looseObject({
-  id: z.number(),
-  subject: z.string().optional(),
-});
+import { parseAllTrails } from '../src/validate.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-describe('parseOFW', () => {
-  it('returns the parsed value on success, preserving unknown keys (loose)', () => {
-    const out = parseOFW(Schema, { id: 1, subject: 'S', extra: 'kept' }, 'GET /x');
-    expect(out).toEqual({ id: 1, subject: 'S', extra: 'kept' });
+const Schema = z.looseObject({ id: z.number(), name: z.string().optional() });
+
+describe('parseAllTrails', () => {
+  it('returns parsed data on a match, preserving unknown keys (loose)', () => {
+    const raw = { id: 7, name: 'Trail', extra: 'kept' };
+    expect(parseAllTrails(Schema, raw, 'ctx')).toEqual(raw);
   });
 
-  it('lenient (default): warns to stderr and returns the raw value on mismatch', () => {
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const raw = { id: 'not-a-number', subject: 5 };
-    const out = parseOFW(Schema, raw, 'GET /pub/v3/messages');
-    expect(out).toBe(raw); // raw passthrough, not a partial parse
-    expect(err).toHaveBeenCalledTimes(1);
-    const msg = err.mock.calls[0][0] as string;
-    expect(msg).toContain('OFW response for GET /pub/v3/messages failed validation');
-    expect(msg).toContain('id:');
-    expect(msg).toContain('subject:');
+  it('lenient (default): warns to stderr and returns the raw response on mismatch', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const raw = { id: 'not-a-number' };
+    const out = parseAllTrails(Schema, raw, 'GET /api/alltrails/v3/trails/{id}');
+    expect(out).toBe(raw);
+    const line = String(errSpy.mock.calls[0][0]);
+    expect(line).toContain('[alltrails-mcp] WARNING');
+    expect(line).toContain('GET /api/alltrails/v3/trails/{id}');
+    expect(line).toContain('id:');
   });
 
-  it('strict: throws with the endpoint context and issue paths', () => {
-    expect(() => parseOFW(Schema, { id: 'x' }, 'POST /pub/v3/messages', 'strict'))
-      .toThrow(/OFW response for POST \/pub\/v3\/messages failed validation: id:/);
+  it('strict: throws with a precise message on mismatch', () => {
+    expect(() => parseAllTrails(Schema, { id: 'x' }, 'POST reviews', 'strict')).toThrow(
+      /AllTrails response for POST reviews failed validation: id:/,
+    );
   });
 
-  it('labels root-level mismatches as (root)', () => {
-    expect(() => parseOFW(Schema, 'a string', 'GET /x', 'strict'))
-      .toThrow(/\(root\):/);
-  });
-
-  it('strict success returns the parsed value', () => {
-    expect(parseOFW(Schema, { id: 7 }, 'GET /x', 'strict')).toEqual({ id: 7 });
+  it('reports the root path when the whole value is the wrong type', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    parseAllTrails(Schema, 'totally wrong', 'ctx');
+    expect(String(errSpy.mock.calls[0][0])).toContain('(root)');
   });
 });

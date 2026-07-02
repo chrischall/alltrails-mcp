@@ -1,11 +1,10 @@
 {
   "mcpServers": {
-    "ofw": {
+    "alltrails": {
       "command": "npx",
-      "args": ["-y", "ofw-mcp"],
+      "args": ["-y", "alltrails-mcp"],
       "env": {
-        "OFW_USERNAME": "${OFW_USERNAME}",
-        "OFW_PASSWORD": "${OFW_PASSWORD}"
+        "ALLTRAILS_COOKIE": "${ALLTRAILS_COOKIE}"
       }
     }
   }

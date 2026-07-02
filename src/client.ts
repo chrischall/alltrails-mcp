@@ -1,187 +1,135 @@
 import { loadDotenvSafely } from '@chrischall/mcp-utils';
-import { TokenManager } from '@chrischall/mcp-utils/session';
+import { createCookieSessionManager, type CookieSessionManager } from '@chrischall/mcp-utils/session';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { resolveAuth } from './auth.js';
-import { parseBoolEnv } from './config.js';
-import { BASE_URL, OFW_PROTOCOL_HEADERS, OFW_TOKEN_TTL_MS, OFW_TOKEN_EXPIRY_SKEW_MS } from './protocol.js';
+import { resolveAuth, AllTrailsConfigError, type AllTrailsSession } from './auth.js';
+import { debugLogEnabled, getApiKey, getCaller, getLocale, getRequestTimeoutMs, getUserAgent } from './config.js';
+import { BASE_URL } from './protocol.js';
 
 // Load .env for local dev; silently skip if dotenv is unavailable (e.g. mcpb
 // bundle). loadDotenvSafely applies override:false + quiet:true and swallows a
-// missing dotenv module, matching the prior inline try/catch exactly.
+// missing dotenv module.
 const __dirname = dirname(fileURLToPath(import.meta.url));
 await loadDotenvSafely({ path: join(__dirname, '..', '.env') });
 
-export interface BinaryResponse {
-  body: Buffer;
-  contentType: string | null;
-  /** Parsed from Content-Disposition header if present. */
-  suggestedFileName: string | null;
-}
-
-// Parse a Content-Disposition header for a filename. Prefers RFC 6266
-// `filename*=UTF-8''…` (percent-decoded) and falls back to `filename="…"`.
-function parseContentDispositionFilename(cd: string): string | null {
-  const extMatch = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(cd);
-  if (extMatch) {
-    const raw = extMatch[1].trim().replace(/^"|"$/g, '');
-    try { return decodeURIComponent(raw); } catch { return raw; }
-  }
-  const m = /filename="?([^";]+)"?/i.exec(cd);
-  return m ? m[1] : null;
-}
-
-// Set OFW_DEBUG_LOG=1 (or true/yes/on) to log every OFW request/response to
-// stderr. Authorization is redacted. Bodies are logged in full — set this
-// only when debugging, never in normal use.
-function debugLogEnabled(): boolean {
-  return parseBoolEnv('OFW_DEBUG_LOG');
-}
-
-function redactHeaders(h: Record<string, string>): Record<string, string> {
+function redactCookie(h: Record<string, string>): Record<string, string> {
   const out = { ...h };
-  /* v8 ignore next -- request headers always carry Authorization (set in request()); the guard is defensive for arbitrary header maps */
-  if (out.Authorization) out.Authorization = `Bearer ${out.Authorization.slice(7, 17)}…`;
+  if (out.Cookie) out.Cookie = `${out.Cookie.slice(0, 12)}… (${out.Cookie.length} chars)`;
   return out;
 }
 
-// Per-request timeout. Overridable via OFW_REQUEST_TIMEOUT_MS. The default
-// (30s) is comfortably above OFW's typical p99 but low enough that a stuck
-// upstream fails fast instead of burning the MCP client-side budget — which
-// is what produced the multi-minute hangs we've seen on ofw_list_messages
-// and ofw_save_draft. Each retry (401/429 replay) gets its own fresh window.
-const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
-function getRequestTimeoutMs(): number {
-  const raw = process.env.OFW_REQUEST_TIMEOUT_MS;
-  if (typeof raw !== 'string' || raw.trim().length === 0) return DEFAULT_REQUEST_TIMEOUT_MS;
-  const n = Number(raw.trim());
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_REQUEST_TIMEOUT_MS;
-}
+export class AllTrailsClient {
+  // Cookie-session lifecycle is delegated to the shared, race-safe
+  // CookieSessionManager: single-flight login (so a burst of concurrent callers
+  // coalesces onto ONE `resolveAuth()`), reactive re-capture on an expiry-shaped
+  // response, and clear-on-settle so a rejected login never sticks. A config
+  // error (nothing configured) is cached as permanent so we don't re-run the
+  // fetchproxy bridge on every tool call. Created lazily so the host's initial
+  // tools/list always succeeds before any credential check runs.
+  private sessionManager: CookieSessionManager<AllTrailsSession> | undefined;
 
-// Sentinel "refresh token" handed to the shared TokenManager. OFW has no
-// OAuth-style refresh token — every renewal re-runs the full `resolveAuth()`
-// (password POST or fetchproxy snapshot). The TokenManager only refuses to
-// refresh when its refresh token is `undefined`, so a non-empty placeholder
-// keeps the single-flight refresh path live; the refresh callback ignores it.
-const OFW_REFRESH_SENTINEL = 'ofw';
-
-export class OFWClient {
-  // Bearer-token lifecycle is delegated to the shared, race-safe TokenManager
-  // (proactive refresh inside the skew window, single-flight refresh so a burst
-  // of concurrent callers coalesces onto ONE `resolveAuth()`, and a 401-replay
-  // guarded against double-refresh). It is created lazily, seeded with an
-  // already-expired placeholder token so the first request drives the refresh
-  // callback — i.e. the original "log in on first request" behavior.
-  private tokenManager: TokenManager | undefined;
-
-  private getTokenManager(): TokenManager {
-    if (!this.tokenManager) {
-      this.tokenManager = new TokenManager({
-        initial: { accessToken: '', refreshToken: OFW_REFRESH_SENTINEL, expiresAt: 0 },
-        skewMs: OFW_TOKEN_EXPIRY_SKEW_MS,
-        // Map OFW's mint/refresh onto the refresh callback. `resolveAuth()`
-        // returns a token and a best-effort expiry; when the fetchproxy path
-        // can't supply one we fall back to the same 6h estimate the password
-        // path uses (the 401-replay covers a wrong guess). We re-arm the
-        // sentinel so the manager can refresh again later.
-        refresh: async () => {
-          const { token, expiresAt } = await resolveAuth();
-          return {
-            accessToken: token,
-            refreshToken: OFW_REFRESH_SENTINEL,
-            expiresAt: (expiresAt ?? new Date(Date.now() + OFW_TOKEN_TTL_MS)).getTime(),
-          };
-        },
+  private getSessionManager(): CookieSessionManager<AllTrailsSession> {
+    if (!this.sessionManager) {
+      this.sessionManager = createCookieSessionManager<AllTrailsSession>({
+        login: () => resolveAuth(),
+        // DataDome expiry and a dropped login session both surface as 401/403.
+        // Flag them so the manager re-captures the browser session and replays
+        // the call exactly once.
+        isExpired: (res) => res.status === 401 || res.status === 403,
+        // A missing-config error is permanent for this process — re-running the
+        // fetchproxy bridge won't help until the user changes their setup.
+        isPermanentError: (err) => err instanceof AllTrailsConfigError,
       });
     }
-    return this.tokenManager;
+    return this.sessionManager;
   }
 
+  /** Issue an authenticated JSON request and parse the response body. */
   async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const response = await this.fetchAuthed(method, path, body, 'application/json');
+    const response = await this.fetchAuthed(method, path, body);
     const text = await response.text();
     if (debugLogEnabled()) {
-      console.error(`[ofw-debug] response body: ${text || '<empty>'}`);
+      console.error(`[alltrails-debug] response body: ${text || '<empty>'}`);
     }
-    return (text ? JSON.parse(text) : null) as T;
+    if (!text) return null as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      // A 2xx that isn't JSON is almost always a DataDome interstitial or an
+      // HTML error page — surface that instead of a bare SyntaxError.
+      throw new Error(
+        `AllTrails returned non-JSON for ${method} ${path} — likely a DataDome bot challenge or an HTML ` +
+          `error page. Refresh a signed-in alltrails.com tab and retry. Body starts: ${text.slice(0, 120)}`,
+      );
+    }
   }
 
-  /** Like `request`, but returns the raw bytes plus Content-Type/-Disposition metadata. */
-  async requestBinary(method: string, path: string): Promise<BinaryResponse> {
-    const response = await this.fetchAuthed(method, path, undefined, 'application/octet-stream');
-    return {
-      body: Buffer.from(await response.arrayBuffer()),
-      contentType: response.headers.get('content-type'),
-      suggestedFileName: parseContentDispositionFilename(response.headers.get('content-disposition') ?? ''),
-    };
-  }
-
-  // Authenticated fetch for both JSON and binary callers. Auth (proactive
-  // refresh inside the skew window + one 401-replay, guarded against a
-  // double-refresh under concurrency) is delegated to the shared TokenManager's
-  // `withAuth`. The 429 wait-and-replay and the non-2xx → throw remain here.
-  private async fetchAuthed(
-    method: string,
-    path: string,
-    body: unknown,
-    accept: string,
-  ): Promise<Response> {
-    // `withAuth` invokes `call` once, and again after a refresh on a 401. The
-    // second invocation is the replay — mark it `(retry)` in the debug log,
-    // preserving the prior bespoke-loop diagnostic.
+  // Authenticated fetch. The 401/403 re-capture + one replay is delegated to
+  // CookieSessionManager.withSession; the 429 wait-and-replay and the
+  // non-2xx → throw remain here (mirroring the fleet's client shape).
+  private async fetchAuthed(method: string, path: string, body: unknown): Promise<Response> {
+    const mgr = this.getSessionManager();
     let attempt = 0;
-    let response = await this.getTokenManager().withAuth((token) =>
-      this.fetchOnce(method, path, body, accept, token, attempt++ > 0),
+    let response = await mgr.withSession((session) =>
+      this.fetchOnce(method, path, body, session, attempt++ > 0),
     );
     if (response.status === 429) {
-      await new Promise<void>((r) => setTimeout(r, 2000));
-      response = await this.getTokenManager().withAuth((token) =>
-        this.fetchOnce(method, path, body, accept, token, true),
-      );
-      if (response.status === 429) throw new Error('Rate limited by OFW API');
+      // Honor a delta-seconds Retry-After when the server sends one (capped at
+      // 30s so a hostile/buggy value can't stall the tool call); otherwise the
+      // fleet's standard 2s.
+      const retryAfterRaw = Number(response.headers.get('retry-after') ?? '');
+      const waitMs =
+        Number.isFinite(retryAfterRaw) && retryAfterRaw > 0
+          ? Math.min(retryAfterRaw, 30) * 1000
+          : 2000;
+      await new Promise<void>((r) => setTimeout(r, waitMs));
+      response = await mgr.withSession((session) => this.fetchOnce(method, path, body, session, true));
+      if (response.status === 429) throw new Error('Rate limited by AllTrails API');
     }
     if (!response.ok) {
-      throw new Error(`OFW API error: ${response.status} ${response.statusText} for ${method} ${path}`);
+      const hint =
+        response.status === 403
+          ? ' — AllTrails uses DataDome bot protection; your captured session may be stale. Refresh a signed-in alltrails.com tab and retry.'
+          : '';
+      throw new Error(`AllTrails API error: ${response.status} ${response.statusText} for ${method} ${path}${hint}`);
     }
     return response;
   }
 
-  // A single OFW API fetch with the bearer token supplied by `withAuth`.
-  // Carries the per-request timeout (AbortController + setTimeout so vitest
-  // fake timers can drive it and we attach a clear error message) and the
-  // OFW_DEBUG_LOG instrumentation. Returns the raw Response — 401/429/non-2xx
-  // handling lives in the callers (`withAuth` and `fetchAuthed`).
+  // A single API fetch with the Cookie + protocol headers supplied by the
+  // resolved session. Carries the per-request timeout (AbortController +
+  // setTimeout so vitest fake timers can drive it) and the debug instrumentation.
   private async fetchOnce(
     method: string,
     path: string,
     body: unknown,
-    accept: string,
-    token: string,
+    session: AllTrailsSession,
     isRetry = false,
   ): Promise<Response> {
-    const isFormData = body instanceof FormData;
     const headers: Record<string, string> = {
-      ...OFW_PROTOCOL_HEADERS,
-      Accept: accept,
-      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+      'User-Agent': getUserAgent(),
+      'x-at-key': session.apiKey ?? getApiKey(),
+      'x-at-caller': getCaller(),
+      'x-language-locale': getLocale(),
+      Origin: BASE_URL,
+      Referer: `${BASE_URL}/`,
+      'Sec-Fetch-Site': 'same-origin',
+      Cookie: session.cookieHeader,
     };
-    if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json';
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
 
     const url = `${BASE_URL}${path}`;
     if (debugLogEnabled()) {
-      const bodyPreview = body === undefined
-        ? '<none>'
-        : isFormData
-          ? `<FormData entries=${Array.from((body as FormData).keys()).join(',')}>`
-          : JSON.stringify(body);
-      console.error(`[ofw-debug] → ${method} ${url}${isRetry ? ' (retry)' : ''}`);
-      console.error(`[ofw-debug]   headers: ${JSON.stringify(redactHeaders(headers))}`);
-      console.error(`[ofw-debug]   body: ${bodyPreview}`);
+      const bodyPreview = body === undefined ? '<none>' : JSON.stringify(body);
+      console.error(`[alltrails-debug] → ${method} ${url}${isRetry ? ' (retry)' : ''}`);
+      console.error(`[alltrails-debug]   headers: ${JSON.stringify(redactCookie(headers))}`);
+      console.error(`[alltrails-debug]   body: ${bodyPreview}`);
     }
 
     // AbortController + setTimeout (not AbortSignal.timeout) so vitest fake
-    // timers can drive the timeout in tests, and so we can attach a clear
-    // error message instead of a bare DOMException on the abort path.
+    // timers can drive the timeout in tests, and so we attach a clear error
+    // message instead of a bare DOMException on the abort path.
     const timeoutMs = getRequestTimeoutMs();
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -193,20 +141,18 @@ export class OFWClient {
         method,
         headers,
         signal: ac.signal,
-        ...(body !== undefined ? { body: isFormData ? body : JSON.stringify(body) } : {}),
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       });
     } catch (err) {
       const elapsed = Date.now() - startedAt;
       if (ac.signal.aborted) {
         if (debugLogEnabled()) {
-          console.error(`[ofw-debug] ⏱ TIMEOUT after ${elapsed}ms: ${method} ${url}`);
+          console.error(`[alltrails-debug] ⏱ TIMEOUT after ${elapsed}ms: ${method} ${url}`);
         }
-        throw new Error(
-          `OFW API request timed out after ${timeoutMs}ms: ${method} ${path}`,
-        );
+        throw new Error(`AllTrails API request timed out after ${timeoutMs}ms: ${method} ${path}`);
       }
       if (debugLogEnabled()) {
-        console.error(`[ofw-debug] ✗ ${(err as Error).message} after ${elapsed}ms: ${method} ${url}`);
+        console.error(`[alltrails-debug] ✗ ${(err as Error).message} after ${elapsed}ms: ${method} ${url}`);
       }
       throw err;
     } finally {
@@ -214,11 +160,11 @@ export class OFWClient {
     }
 
     if (debugLogEnabled()) {
-      console.error(`[ofw-debug] ← ${response.status} ${response.statusText} (${Date.now() - startedAt}ms)`);
+      console.error(`[alltrails-debug] ← ${response.status} ${response.statusText} (${Date.now() - startedAt}ms)`);
     }
 
     return response;
   }
 }
 
-export const client = new OFWClient();
+export const client = new AllTrailsClient();

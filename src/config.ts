@@ -1,94 +1,71 @@
-import { createHash } from 'node:crypto';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { parseBoolEnv as parseBoolEnvUtil } from '@chrischall/mcp-utils';
-
-// Cache identity drives the per-user SQLite DB filename. Order of preference:
-//   1. OFW_CACHE_IDENTITY — explicit override for users who want to label the
-//      cache themselves (e.g. when authing via fetchproxy and OFW_USERNAME is
-//      not set).
-//   2. OFW_USERNAME — legacy path; existing users keep their existing DB.
-//   3. "_default" — fallback for fetchproxy-only setups where neither is set.
-//      Single-user installs are fine on this; multi-account users should set
-//      OFW_CACHE_IDENTITY explicitly so their caches don't collide.
-function readCacheIdentity(): string {
-  const explicit = process.env.OFW_CACHE_IDENTITY;
-  if (typeof explicit === 'string' && explicit.trim().length > 0) return explicit.trim();
-  const username = process.env.OFW_USERNAME;
-  if (typeof username === 'string' && username.trim().length > 0) return username.trim();
-  return '_default';
-}
-
-export function getCacheDir(): string {
-  const override = process.env.OFW_CACHE_DIR;
-  if (override && override.trim().length > 0) return override.trim();
-  return join(homedir(), '.cache', 'ofw-mcp');
-}
-
-export function getCacheDbPath(): string {
-  const identity = readCacheIdentity();
-  const hash = createHash('sha256').update(identity).digest('hex').slice(0, 16);
-  return join(getCacheDir(), `${hash}.db`);
-}
-
-export function getAttachmentsDir(): string {
-  const override = process.env.OFW_ATTACHMENTS_DIR;
-  if (override && override.trim().length > 0) return override.trim();
-  // Default to ~/Downloads/ofw-mcp/ — the cache dir (~/.cache/...) is hidden and
-  // typically outside the filesystem allowlist of sandboxed MCP hosts like
-  // Claude Desktop, so files written there are unreadable to the model that
-  // just downloaded them. Downloads is the standard "user-accessible files"
-  // location across macOS/Linux/Windows.
-  return join(homedir(), 'Downloads', 'ofw-mcp');
-}
+import { parseBoolEnv as parseBoolEnvUtil, readEnvVar } from '@chrischall/mcp-utils';
+import {
+  DEFAULT_ALLTRAILS_API_KEY,
+  DEFAULT_CALLER,
+  DEFAULT_LOCALE,
+  DEFAULT_USER_AGENT,
+} from './protocol.js';
 
 /**
  * True when a boolean-shaped env var is set to "1", "true", "yes", or "on"
- * (case-insensitive, trimmed). Anything else — unset, empty, or other
- * values — is false. Used for OFW_INLINE_ATTACHMENTS, OFW_DISABLE_FETCHPROXY,
- * OFW_DEBUG_LOG, etc.
+ * (case-insensitive, trimmed). Anything else — unset, empty, or other values —
+ * is false. Used for ALLTRAILS_DISABLE_FETCHPROXY, ALLTRAILS_DEBUG_LOG, etc.
  *
- * Delegates to @chrischall/mcp-utils' `parseBoolEnv` (which also recognizes
- * the falsy set 0/false/no/off — behavior-equivalent here since callers only
- * care about the truthy case and everything else defaults to false).
+ * Delegates to @chrischall/mcp-utils' `parseBoolEnv`.
  */
 export function parseBoolEnv(name: string): boolean {
   return parseBoolEnvUtil(name);
 }
 
-export type WriteMode = 'none' | 'drafts' | 'all';
-
 /**
- * Gate for write-tool registration, read at registration time (startup).
- *
- *   none    No write tools are registered — pure read/sync/search surface.
- *   drafts  Draft-level writes only (ofw_save_draft, ofw_delete_draft,
- *           ofw_upload_attachment). Nothing that lands on the court-visible
- *           record (send, calendar/expense/journal writes) is registered —
- *           the only way to send remains a human in the OFW web UI.
- *   all     Every tool registers (the default; fully backward compatible).
- *
- * Unregistered tools cannot be invoked by any host permission setting or
- * injected instruction — the gate is structural, not behavioral. An
- * unrecognized value fails closed to 'none': this is a safety control, so a
- * typo must never silently grant write access.
+ * The `x-at-key` app key sent on every request. Defaults to the embedded value
+ * observed in the wild; override with ALLTRAILS_API_KEY when AllTrails rotates
+ * it. A live value captured from the browser (auth.ts) takes precedence over
+ * both — this getter is only the fallback.
  */
-export function getWriteMode(): WriteMode {
-  const raw = process.env.OFW_WRITE_MODE;
-  if (typeof raw !== 'string' || raw.trim().length === 0) return 'all';
-  const mode = raw.trim().toLowerCase();
-  if (mode === 'none' || mode === 'drafts' || mode === 'all') return mode;
-  // stdio transport: stderr only — stdout is reserved for JSON-RPC.
-  console.error(
-    `[ofw-mcp] Unrecognized OFW_WRITE_MODE "${raw.trim()}" — failing closed to "none" (no write tools registered). Valid values: none, drafts, all.`,
-  );
-  return 'none';
+export function getApiKey(): string {
+  return readEnvVar('ALLTRAILS_API_KEY') ?? DEFAULT_ALLTRAILS_API_KEY;
 }
 
-// Default for ofw_download_attachment's `inline` arg when the caller doesn't
-// pass one. Set OFW_INLINE_ATTACHMENTS=true to have attachments returned as
-// MCP content blocks by default (skipping disk) — useful on sandboxed MCP
-// hosts where filesystem reads back to the model aren't available.
-export function getDefaultInlineAttachments(): boolean {
-  return parseBoolEnv('OFW_INLINE_ATTACHMENTS');
+/** The `x-at-caller` header. Override with ALLTRAILS_CALLER. */
+export function getCaller(): string {
+  return readEnvVar('ALLTRAILS_CALLER') ?? DEFAULT_CALLER;
+}
+
+/** The `x-language-locale` header. Override with ALLTRAILS_LOCALE. */
+export function getLocale(): string {
+  return readEnvVar('ALLTRAILS_LOCALE') ?? DEFAULT_LOCALE;
+}
+
+/** The browser-like `User-Agent`. Override with ALLTRAILS_USER_AGENT. */
+export function getUserAgent(): string {
+  return readEnvVar('ALLTRAILS_USER_AGENT') ?? DEFAULT_USER_AGENT;
+}
+
+/**
+ * Explicit AllTrails numeric user id for the per-user endpoints (saved lists,
+ * completed trails, feed). Optional: when unset, those tools resolve the
+ * current user's id via `GET /api/alltrails/me`. Set ALLTRAILS_USER_ID to skip
+ * that lookup (or to target a public profile other than your own).
+ */
+export function getConfiguredUserId(): string | undefined {
+  return readEnvVar('ALLTRAILS_USER_ID');
+}
+
+// Per-request timeout. Overridable via ALLTRAILS_REQUEST_TIMEOUT_MS. The 30s
+// default is comfortably above AllTrails' typical latency but low enough that a
+// stuck upstream (or a DataDome challenge that never resolves) fails fast
+// instead of burning the MCP client-side budget.
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+export function getRequestTimeoutMs(): number {
+  const raw = process.env.ALLTRAILS_REQUEST_TIMEOUT_MS;
+  if (typeof raw !== 'string' || raw.trim().length === 0) return DEFAULT_REQUEST_TIMEOUT_MS;
+  const n = Number(raw.trim());
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
+// Set ALLTRAILS_DEBUG_LOG=1 (or true/yes/on) to log every request/response to
+// stderr. The Cookie header is redacted. Diagnostic only — never in normal use.
+export function debugLogEnabled(): boolean {
+  return parseBoolEnv('ALLTRAILS_DEBUG_LOG');
 }

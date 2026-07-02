@@ -1,8 +1,8 @@
-import { expandPath as expandPathUtil, rawTextResult, textResult } from '@chrischall/mcp-utils';
+import { rawTextResult, textResult } from '@chrischall/mcp-utils';
 import { z } from 'zod';
-import type { Recipient } from '../cache.js';
-import type { OFWClient } from '../client.js';
-import { parseOFW } from '../validate.js';
+import type { AllTrailsClient } from '../client.js';
+import { getConfiguredUserId } from '../config.js';
+import { parseAllTrails } from '../validate.js';
 
 // Pretty-printed JSON tool result. Thin wrapper over @chrischall/mcp-utils'
 // `textResult` so the rest of the codebase keeps the local name.
@@ -11,112 +11,207 @@ export const jsonResponse = textResult;
 // Raw-string tool result. Wrapper over @chrischall/mcp-utils' `rawTextResult`.
 export const textResponse = rawTextResult;
 
-// OFW API shape for `recipients[]` on message/draft list and detail
-// responses. Used wherever we validate the response of a `/pub/v3/messages*`
-// call. Loose: unknown keys pass through (and survive into cached listData).
-export const ApiRecipientSchema = z.looseObject({
-  user: z.looseObject({ id: z.number().optional(), name: z.string().optional() }).optional(),
-  viewed: z.looseObject({ dateTime: z.string() }).nullable().optional(),
+// `GET /api/alltrails/me` returns the signed-in user; we only read the id.
+// Loose: every other field passes through untouched.
+const MeSchema = z.looseObject({
+  user: z.looseObject({ id: z.union([z.number(), z.string()]).optional() }).optional(),
+  id: z.union([z.number(), z.string()]).optional(),
 });
-export type ApiRecipient = z.infer<typeof ApiRecipientSchema>;
-
-// Translates OFW API recipient shape into the cache's normalized Recipient.
-// Used wherever we surface or persist recipients (sync, get_message, send,
-// save_draft) — all five call sites had near-identical inline mappings.
-export function mapRecipients(items: ApiRecipient[] | undefined | null): Recipient[] {
-  return (items ?? []).map((r) => ({
-    userId: r.user?.id ?? 0,
-    name: r.user?.name ?? '',
-    viewedAt: r.viewed?.dateTime ?? null,
-  }));
-}
-
-// Expand a user-provided path: ~ → home, relative → absolute. Re-exports
-// @chrischall/mcp-utils' `expandPath`.
-export const expandPath = expandPathUtil;
 
 /**
- * Best-effort check that OFW actually persisted what we posted. OFW's
- * draft-update path is known to silently no-op while echoing success in the
- * POST response, so callers re-GET the detail and compare it to what was
- * sent. Containment (not equality) because OFW legitimately transforms
- * content — replies get the original message appended to the body
- * (includeOriginal) and may get a subject prefix. Returns a WARNING string
- * when the persisted content can't be confirmed to contain what was sent,
- * else null.
+ * Resolve the AllTrails user id for the per-user endpoints. Priority:
+ *   1. an explicit `userId` argument passed to the tool,
+ *   2. the ALLTRAILS_USER_ID env var,
+ *   3. a `GET /api/alltrails/me` lookup of the signed-in user.
+ *
+ * Throws an actionable error if none of those yields an id (e.g. the session
+ * isn't actually signed in — `/me` is anonymous).
  */
-export function verifyWriteLanded(
-  kind: 'message' | 'draft',
-  sent: { subject: string; body: string },
-  persisted: { subject?: string; body?: string },
-): string | null {
-  const mismatches: string[] = [];
-  if (typeof persisted.subject !== 'string' || !persisted.subject.includes(sent.subject)) {
-    mismatches.push('subject');
+export async function resolveUserId(client: AllTrailsClient, provided?: string): Promise<string> {
+  const explicit = provided?.trim() || getConfiguredUserId();
+  if (explicit) return explicit;
+  const me = parseAllTrails(MeSchema, await client.request('GET', '/api/alltrails/me'), 'GET /api/alltrails/me');
+  const id = me?.user?.id ?? me?.id;
+  if (id === undefined || id === null || `${id}`.length === 0) {
+    throw new Error(
+      'Could not determine your AllTrails user id from /api/alltrails/me — you may not be signed in. ' +
+        'Pass a userId explicitly, set ALLTRAILS_USER_ID, or capture a signed-in browser session.',
+    );
   }
-  if (typeof persisted.body !== 'string' || !persisted.body.includes(sent.body)) {
-    mismatches.push('body');
-  }
-  if (mismatches.length === 0) return null;
-  return `WARNING: the ${kind} re-fetched from OFW does not contain the ${mismatches.join(' and ')} that was posted — OFW may have silently dropped or altered the write. Verify the ${kind} on ourfamilywizard.com before relying on it.`;
+  return `${id}`;
 }
 
-// POST /pub/v3/messages response: minimal, `{entityId: <id>}` or legacy
-// `{id: <id>}`, sometimes an empty body (→ null). Validated STRICT: a
-// mistyped id (e.g. entityId as a string) must throw rather than silently
-// degrade into the "unconfirmed send" path when the write actually landed.
-// Absence of both ids stays legal — callers handle it with a WARNING.
-const PostMessagesResponseSchema = z.looseObject({
-  id: z.number().optional(),
-  entityId: z.number().optional(),
-}).nullable();
+// A single trail as it appears in the `locations/{states|countries}/{id}/trails`
+// listing responses. Loose — only the fields the compact projection reads are
+// named; everything else passes through. The id lives under `objectID`/`ID`/`id`
+// depending on the endpoint variant, so all three are optional.
+const RawTrailSchema = z.looseObject({
+  objectID: z.union([z.number(), z.string()]).optional(),
+  ID: z.union([z.number(), z.string()]).optional(),
+  id: z.union([z.number(), z.string()]).optional(),
+  name: z.string().optional(),
+  slug: z.string().optional(),
+  length: z.number().optional(),
+  elevation_gain: z.number().optional(),
+  difficulty_rating: z.union([z.number(), z.string()]).optional(),
+  avg_rating: z.number().optional(),
+  num_reviews: z.union([z.number(), z.string()]).optional(),
+  area_name: z.string().optional(),
+  state_name: z.string().optional(),
+  popularity: z.number().optional(),
+});
+type RawTrail = z.infer<typeof RawTrailSchema>;
+
+// Listing envelope: the endpoints wrap the results in `{ trails: [...] }`.
+export const TrailListSchema = z.looseObject({
+  trails: z.array(RawTrailSchema).optional(),
+});
+
+/** A compact, agent-friendly projection of a listing trail — the fields worth ranking on. */
+export interface TrailSummary {
+  id?: string;
+  name?: string;
+  slug?: string;
+  lengthMeters?: number;
+  /** Derived from lengthMeters (2 decimal places) — AllTrails stores metric. */
+  lengthMiles?: number;
+  elevationGainMeters?: number;
+  /** Derived from elevationGainMeters (whole feet). */
+  elevationGainFeet?: number;
+  difficulty?: number | string;
+  rating?: number;
+  numReviews?: number | string;
+  area?: string;
+  region?: string;
+  popularity?: number;
+}
+
+const METERS_PER_MILE = 1609.344;
+const FEET_PER_METER = 3.28084;
+
+/** Meters → miles, rounded to 2 decimals. Undefined passes through. */
+export function metersToMiles(m: number | undefined): number | undefined {
+  return m === undefined ? undefined : Math.round((m / METERS_PER_MILE) * 100) / 100;
+}
+
+/** Meters → feet, rounded to a whole number. Undefined passes through. */
+export function metersToFeet(m: number | undefined): number | undefined {
+  return m === undefined ? undefined : Math.round(m * FEET_PER_METER);
+}
 
 /**
- * POST a payload to /pub/v3/messages, then immediately GET the detail
- * endpoint for the resulting message id. This is the only correct way to
- * populate the cache after `ofw_send_message` or `ofw_save_draft`:
- *
- *  - OFW's POST response is minimal (typically just `{entityId: <id>}`
- *    or sometimes legacy `{id: <id>}`), so we can't build a full row
- *    from it directly.
- *  - Worse, on draft updates OFW returns the same success shape even
- *    when the server silently no-ops, so the GET is also how we verify
- *    the write landed (callers compare detail.body to args.body).
- *
- * Both responses are validated STRICT against `detailSchema` / the POST
- * schema (this is the write-verification boundary — issue #83); `ctx`
- * names the calling tool in the error message.
- *
- * Returns a discriminated union so callers can narrow with
- * `if (result.id !== null)`. When id is null (no id field in the
- * response — never observed in production, but defensive), `raw`
- * carries the POST response so the caller can still surface it.
+ * Project a raw listing trail into a {@link TrailSummary}. `undefined` fields
+ * are dropped by `JSON.stringify`, so the emitted object only carries what the
+ * API actually returned. The id falls back across the endpoint's id variants.
+ * Imperial fields are derived locally (AllTrails stores metric), so an agent
+ * answering a US user never has to do the conversion itself.
  */
-export async function postMessageAndRefetch<S extends z.ZodType>(
-  client: OFWClient,
-  payload: unknown,
-  detailSchema: S,
+export function summarizeTrail(raw: RawTrail): TrailSummary {
+  const id = raw.objectID ?? raw.ID ?? raw.id;
+  return {
+    id: id === undefined ? undefined : `${id}`,
+    name: raw.name,
+    slug: raw.slug,
+    lengthMeters: raw.length,
+    lengthMiles: metersToMiles(raw.length),
+    elevationGainMeters: raw.elevation_gain,
+    elevationGainFeet: metersToFeet(raw.elevation_gain),
+    difficulty: raw.difficulty_rating,
+    rating: raw.avg_rating,
+    numReviews: raw.num_reviews,
+    area: raw.area_name,
+    region: raw.state_name,
+    popularity: raw.popularity,
+  };
+}
+
+// Detail-only fields on `GET /v3/trails/{id}` (same `{ trails: [...] }`
+// envelope as the listings, richer per-trail record). Loose as always.
+const RawTrailDetailSchema = RawTrailSchema.extend({
+  overview: z.string().optional(),
+  routeType: z.looseObject({ name: z.string().optional() }).optional(),
+  location: z
+    .looseObject({
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
+      city: z.string().optional(),
+      region: z.string().optional(),
+      country: z.string().optional(),
+    })
+    .optional(),
+});
+
+// Detail envelope — one-element `trails` array in practice; we project them all.
+export const TrailDetailSchema = z.looseObject({
+  trails: z.array(RawTrailDetailSchema).optional(),
+});
+
+/** {@link TrailSummary} plus the detail-only fields worth keeping in compact mode. */
+export interface TrailDetailSummary extends TrailSummary {
+  overview?: string;
+  routeType?: string;
+  location?: { latitude?: number; longitude?: number; city?: string; region?: string; country?: string };
+}
+
+/** Project a raw detail trail: the listing summary plus overview/route type/location. */
+export function summarizeTrailDetail(raw: z.infer<typeof RawTrailDetailSchema>): TrailDetailSummary {
+  return {
+    ...summarizeTrail(raw),
+    overview: raw.overview,
+    routeType: raw.routeType?.name,
+    location: raw.location && {
+      latitude: raw.location.latitude,
+      longitude: raw.location.longitude,
+      city: raw.location.city,
+      region: raw.location.region,
+      country: raw.location.country,
+    },
+  };
+}
+
+// A single review from `POST /v2/trails/{id}/reviews/search`. Loose — only the
+// fields the compact projection reads are named.
+const RawReviewSchema = z.looseObject({
+  user: z.looseObject({ name: z.string().optional() }).optional(),
+  rating: z.union([z.number(), z.string()]).optional(),
+  comment: z.string().optional(),
+});
+
+// Reviews envelope: the endpoint wraps results in `{ trail_reviews: [...] }`.
+export const ReviewListSchema = z.looseObject({
+  trail_reviews: z.array(RawReviewSchema).optional(),
+});
+
+/** A compact projection of a trail review. */
+export interface ReviewSummary {
+  user?: string;
+  rating?: number | string;
+  comment?: string;
+}
+
+/** Project a raw review into a {@link ReviewSummary}. Undefined fields are dropped by JSON.stringify. */
+export function summarizeReview(raw: z.infer<typeof RawReviewSchema>): ReviewSummary {
+  return { user: raw.user?.name, rating: raw.rating, comment: raw.comment };
+}
+
+/**
+ * GET a trail-listing endpoint and return the tool result. Validates the
+ * envelope (lenient — drift warns to stderr, never throws). When `compact` is
+ * set and the response carried the expected `trails` array, returns a slim
+ * `{ count, trails: TrailSummary[] }`; otherwise returns the raw response
+ * unchanged (full detail, and the safe fallback if the shape drifted).
+ */
+export async function fetchTrailListing(
+  client: AllTrailsClient,
+  path: string,
   ctx: string,
-): Promise<
-  | { id: number; detail: z.output<S>; raw: unknown }
-  | { id: null; detail: null; raw: unknown }
-> {
-  const raw = parseOFW(
-    PostMessagesResponseSchema,
-    await client.request('POST', '/pub/v3/messages', payload),
-    `POST /pub/v3/messages (${ctx})`,
-    'strict',
-  );
-  const id =
-    typeof raw?.id === 'number' ? raw.id
-    : typeof raw?.entityId === 'number' ? raw.entityId
-    : null;
-  if (id === null) return { id: null, detail: null, raw };
-  const detail = parseOFW(
-    detailSchema,
-    await client.request('GET', `/pub/v3/messages/${id}`),
-    `GET /pub/v3/messages/{id} (${ctx})`,
-    'strict',
-  );
-  return { id, detail, raw };
+  compact: boolean,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const raw = await client.request('GET', path);
+  const parsed = parseAllTrails(TrailListSchema, raw, ctx);
+  if (compact && Array.isArray(parsed.trails)) {
+    const trails = parsed.trails.map(summarizeTrail);
+    return jsonResponse({ count: trails.length, trails });
+  }
+  return jsonResponse(raw);
 }

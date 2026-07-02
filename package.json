@@ -1,20 +1,20 @@
 {
-  "name": "ofw-mcp",
-  "version": "2.4.3",
+  "name": "alltrails-mcp",
+  "version": "0.1.0",
   "license": "MIT",
-  "mcpName": "io.github.chrischall/ofw-mcp",
-  "description": "OurFamilyWizard MCP server for Claude — developed and maintained by AI (Claude Code)",
+  "mcpName": "io.github.chrischall/alltrails-mcp",
+  "description": "Unofficial AllTrails MCP server for Claude — developed and maintained by AI (Claude Code)",
   "author": "Claude Code (AI) <https://www.anthropic.com/claude>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chrischall/ofw-mcp.git"
+    "url": "git+https://github.com/chrischall/alltrails-mcp.git"
   },
   "type": "module",
   "engines": {
     "node": ">=22.5.0"
   },
   "bin": {
-    "ofw-mcp": "dist/index.js"
+    "alltrails-mcp": "dist/index.js"
   },
   "files": [
     "dist",
