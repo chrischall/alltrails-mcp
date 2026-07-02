@@ -144,6 +144,32 @@ describe('alltrails_get_trail_photos', () => {
   });
 });
 
+describe('alltrails_get_trail_gpx', () => {
+  it('fetches detail=offline and returns a GPX document', async () => {
+    // Minimal captured-shape response; 'ol{~Ff`|uO' is not a real polyline but
+    // decodes without error, which is all this wiring test needs.
+    const { client, handlers } = setup({
+      trails: [
+        {
+          name: 'Rim Trail',
+          defaultMap: {
+            routes: [{ lineSegments: [{ polyline: { pointsData: '_p~iF~ps|U', indexedElevationData: null } }] }],
+          },
+        },
+      ],
+    });
+    const result = await handlers.get('alltrails_get_trail_gpx')!({ trailId: '99' });
+    expect(client.request).toHaveBeenCalledWith('GET', '/api/alltrails/v3/trails/99?detail=offline');
+    expect(result.content[0].text).toContain('<gpx version="1.1"');
+    expect(result.content[0].text).toContain('<name>Rim Trail</name>');
+  });
+
+  it('surfaces the no-geometry error when the shape drifted', async () => {
+    const { handlers } = setup({ trails: [{ name: 'X' }] });
+    await expect(handlers.get('alltrails_get_trail_gpx')!({ trailId: '99' })).rejects.toThrow(/no route geometry/i);
+  });
+});
+
 describe('alltrails_get_trail_weather', () => {
   it('GETs the weather overview endpoint', async () => {
     const { client, handlers } = setup({ weather: {} });

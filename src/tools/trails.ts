@@ -1,12 +1,14 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
+import { OfflineTrailSchema, trailToGpx } from '../gpx.js';
 import {
   jsonResponse,
   PhotoListSchema,
   ReviewListSchema,
   summarizePhoto,
   summarizeReview,
+  textResponse,
   TrailDetailSchema,
   summarizeTrailDetail,
 } from './_shared.js';
@@ -90,6 +92,23 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
       }
     }
     return jsonResponse(raw);
+  });
+
+  server.registerTool('alltrails_get_trail_gpx', {
+    description:
+      'Export an AllTrails trail\'s route as a GPX 1.1 document (track points with per-point elevation), ' +
+      'built from the trail\'s offline-detail route geometry. Returns raw GPX XML suitable for saving to ' +
+      'a .gpx file or importing into navigation apps.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      trailId: z.string().describe('Numeric AllTrails trail id'),
+    },
+  }, async (args) => {
+    const raw = await client.request('GET', `/api/alltrails/v3/trails/${encodeURIComponent(args.trailId)}?detail=offline`);
+    // Strict: a mistyped geometry field must halt with a clear error, not
+    // silently emit an empty/broken GPX file.
+    const parsed = parseAllTrails(OfflineTrailSchema, raw, 'GET /api/alltrails/v3/trails/{id}?detail=offline', 'strict');
+    return textResponse(trailToGpx(parsed));
   });
 
   server.registerTool('alltrails_get_trail_weather', {
