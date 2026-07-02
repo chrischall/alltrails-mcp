@@ -155,17 +155,20 @@ export interface TrailDetailSummary extends TrailSummary {
 
 /** Project a raw detail trail: the listing summary plus overview/route type/location. */
 export function summarizeTrailDetail(raw: z.infer<typeof RawTrailDetailSchema>): TrailDetailSummary {
+  const location = raw.location && {
+    latitude: raw.location.latitude,
+    longitude: raw.location.longitude,
+    city: raw.location.city,
+    region: raw.location.region,
+    country: raw.location.country,
+  };
   return {
     ...summarizeTrail(raw),
     overview: raw.overview,
     routeType: raw.routeType?.name,
-    location: raw.location && {
-      latitude: raw.location.latitude,
-      longitude: raw.location.longitude,
-      city: raw.location.city,
-      region: raw.location.region,
-      country: raw.location.country,
-    },
+    // Drop location entirely when the object carried no usable fields — otherwise
+    // it would serialize to a noisy empty `{}`.
+    location: location && Object.values(location).some((v) => v !== undefined) ? location : undefined,
   };
 }
 
