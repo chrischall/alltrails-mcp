@@ -118,6 +118,7 @@ All tools are **read-only** — this server never writes to AllTrails.
 | `alltrails_get_trail` | Trail details (`detail`: `basic`/`medium`/`offline`; `compact` for a slim projection) |
 | `alltrails_get_trail_reviews` | User reviews for a trail (`compact` for `{user, rating, comment}`) |
 | `alltrails_get_trail_photos` | Photos for a trail (`compact` for slim records with a fetchable image `url`) |
+| `alltrails_get_trail_gpx` | Export a trail's route as GPX 1.1 (track points + elevation) |
 | `alltrails_get_trail_weather` | Weather overview for a trail |
 | `alltrails_get_profile` | The signed-in user's profile |
 | `alltrails_list_user_lists` | A user's saved lists / favorites |
@@ -156,7 +157,7 @@ src/
   validate.ts       parseAllTrails(): zod validation of responses at call sites
   tools/
     _shared.ts      Response helpers + resolveUserId
-    trails.ts       get_trail, reviews, photos, weather
+    trails.ts       get_trail, reviews, photos, weather, gpx export
     explore.ts      search, list by state/country
     user.ts         profile, saved lists, completed trails, activity feed
 tests/              Mirrors src/; mocks AllTrailsClient.request via vi.spyOn

@@ -47,6 +47,7 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
 | `alltrails_get_trail(trailId, detail?, compact?)` | Trail details. `detail`: `basic` \| `medium` (default) \| `offline` (includes route geometry). `compact=true` returns a slim projection (name, overview, length in m+mi, elevation gain in m+ft, difficulty, rating, route type, location) — prefer it unless you need the full record or geometry. |
 | `alltrails_get_trail_reviews(trailId, limit?, compact?)` | User reviews (default limit 20). `compact=true` returns just `{ user, rating, comment }` per review. |
 | `alltrails_get_trail_photos(trailId, compact?)` | Trail photos. `compact=true` returns `{ id, title, likeCount, user, uploadedAt, url }` per photo — `url` serves the actual image. |
+| `alltrails_get_trail_gpx(trailId)` | Export the trail's route as a GPX 1.1 document (track points with per-point elevation) — save to `.gpx` or import into nav apps. |
 | `alltrails_get_trail_weather(trailId)` | Weather overview for the trail. |
 
 ### Per-user (requires a signed-in session)

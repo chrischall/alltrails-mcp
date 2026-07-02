@@ -25,9 +25,10 @@ src/
   auth.ts           resolveAuth(): two-path priority (ALLTRAILS_COOKIE env → fetchproxy capture → error) returning a Cookie header. Cookie variant of the fleet's Pattern A
   config.ts         env-driven header/UA/api-key/user-id/timeout/debug getters
   validate.ts       parseAllTrails(): zod validation of AllTrails responses at call sites (lenient reads / strict where a mistype must halt)
+  gpx.ts            decodePolyline() (generalized Google polyline varint decoder) + trailToGpx() (offline-detail route geometry → GPX 1.1) + OfflineTrailSchema
   tools/
     _shared.ts      response helpers + resolveUserId (arg → ALLTRAILS_USER_ID → /api/alltrails/me users[0].id) + the compact projections (summarizeTrail/TrailDetail/Review/Photo/SearchResult/FeedItem + their loose schemas + fetchTrailListing)
-    trails.ts       get_trail, get_trail_reviews, get_trail_photos, get_trail_weather
+    trails.ts       get_trail, get_trail_reviews, get_trail_photos, get_trail_weather, get_trail_gpx
     explore.ts      search, list_trails_by_state, list_trails_by_country
     user.ts         get_profile, list_user_lists, list_completed_trails, get_activity_feed (feed?: local|timeline|personal follows the actual feed; omitted → directory)
 tests/              mirrors src/; mocks AllTrailsClient.request via vi.spyOn; auth tests mock @fetchproxy/bootstrap at the module boundary
@@ -83,6 +84,7 @@ Every JSON response is validated with zod at the call site via `parseAllTrails(s
   - **`GET /me`** wraps the signed-in user as `{ users: [{ id, ... }] }` (NOT `{ user: ... }` — `resolveUserId` reads `users[0].id`, keeping the other variants as drift tolerance).
   - **`GET /v2/trails/{id}/photos`** → `{ photos: [{ id, title, description, likeCount, photoHash, user, location, metadata.created }] }`. No image URL in the record; `GET /api/alltrails/photos/{id}/image?size=large&key=<x-at-key>` (the `size` param is required) 302s to the images CDN and is **not** DataDome-walled — the compact projection derives it.
   - **`POST /explore/v1/search`** → `{ summary: { count }, queryId, searchResults: [...], collections, boundingBox }`. Results are Algolia-formatted like the listings but `objectID` is prefixed (`"trail-{id}"`) — prefer the numeric `ID`. The body `limit` is **ignored** (500 results came back for `limit: 5`), so compact mode truncates client-side. Free-text relevance is questionable (a `q` of "angels landing" returned LA-area trails); treat as best-effort and expect drift.
+  - **`GET /v3/trails/{id}?detail=offline`** carries the route as Google encoded polylines under `trails[0].defaultMap.routes[].lineSegments[].polyline`: `pointsData` is 2-dim (lat, lng)×1e5; `indexedElevationData` is 2-dim (pointIndex×100, elevationMeters×1e5) with exactly one pair per point; `elevationData` was null. `alltrails_get_trail_gpx` decodes these into GPX 1.1.
   - **`GET .../users/{id}/feeds`** returns a feed **directory** (`{ feeds: [{ name, displayName, links }], initialFeedHint }`), not items. The items live at `.../feeds/{local|timeline|personal}?maxItems=N&cursor=...` → `{ sections: [{ section_type: 'feed-item', itemData: { itemType, timestamp, description (HTML), user, trail, activity { summaryStats }, review } }], pageInfo: { hasNextPage, nextCursor } }`. Units: `summaryStats.distanceTotal`/`elevationGain` are meters, `duration` is minutes, `timeTotal`/`timeMoving` are seconds.
 
 ## Testing
