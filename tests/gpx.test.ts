@@ -54,9 +54,10 @@ describe('trailToGpx', () => {
     [63.7315, -148.91909],
     [63.73153, -148.91916],
   ];
+  // Raw dim0 is pointIndex×100 (captured); ÷1e5 in decoding → pointIndex/1000.
   const elevations = [
     [0, 538.92],
-    [100, 539.57],
+    [0.001, 539.57],
   ];
   const capturedShape = {
     trails: [
@@ -89,6 +90,31 @@ describe('trailToGpx', () => {
     expect(gpx).toContain('<name>Mount Healy &lt;Overlook&gt; &amp; Co</name>');
     expect(gpx).toContain('<trkpt lat="63.7315" lon="-148.91909"><ele>538.92</ele></trkpt>');
     expect(gpx).toContain('<trkpt lat="63.73153" lon="-148.91916"><ele>539.57</ele></trkpt>');
+  });
+
+  it('maps elevations by their encoded point index, not by array position', () => {
+    // A sparse stream: elevation pairs exist only for points 0 and 2 (raw
+    // indices 0 and 200 → decoded 0 and 0.002). Positional lookup would
+    // wrongly give point 1 the second elevation; index-based mapping leaves
+    // it bare.
+    const threePoints = [
+      [63.7315, -148.91909],
+      [63.73153, -148.91916],
+      [63.73149, -148.91928],
+    ];
+    const sparse = structuredClone(capturedShape);
+    sparse.trails[0].defaultMap.routes[0].lineSegments[0].polyline.pointsData = encode(threePoints, 1e5);
+    sparse.trails[0].defaultMap.routes[0].lineSegments[0].polyline.indexedElevationData = encode(
+      [
+        [0, 538.92],
+        [0.002, 540.14],
+      ],
+      1e5,
+    );
+    const gpx = trailToGpx(sparse);
+    expect(gpx).toContain('<trkpt lat="63.7315" lon="-148.91909"><ele>538.92</ele></trkpt>');
+    expect(gpx).toContain('<trkpt lat="63.73153" lon="-148.91916"/>'); // no elevation pair at index 100
+    expect(gpx).toContain('<trkpt lat="63.73149" lon="-148.91928"><ele>540.14</ele></trkpt>');
   });
 
   it('omits <ele> when the segment has no elevation stream', () => {
