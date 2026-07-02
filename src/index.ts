@@ -13,7 +13,7 @@ import { registerUserTools } from './tools/user.js';
 // always succeeds before any credential check runs.
 await runMcp({
   name: 'alltrails',
-  version: '0.2.0', // x-release-please-version
+  version: '0.3.0', // x-release-please-version
   deps: client,
   tools: [registerTrailTools, registerExploreTools, registerUserTools],
   banner:
