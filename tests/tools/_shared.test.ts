@@ -207,6 +207,13 @@ describe('summarizePhoto', () => {
     expect(s.user).toBe('Ana');
   });
 
+  it('url-encodes the photo id in the derived image url', () => {
+    // Defensive: ids are numeric in practice, but every other path-param
+    // interpolation in the repo encodes — keep the URL safe under drift.
+    const s = summarizePhoto({ id: 'a/b?c' });
+    expect(s.url).toContain('/api/alltrails/photos/a%2Fb%3Fc/image');
+  });
+
   it('maps the explicit nulls the live payload carries to omitted fields', () => {
     const s = summarizePhoto({
       id: 9,
@@ -335,6 +342,22 @@ describe('summarizeFeedItem', () => {
       },
       review: { rating: 4 },
     });
+  });
+
+  it('decodes html entities left behind after stripping tags', () => {
+    const s = summarizeFeedItem({
+      itemType: 'activity:created',
+      description: 'Hiked <a href="/trail/x">Bob &amp; Alice&#39;s &quot;Loop&quot; &lt;Trail&gt;&nbsp;#2</a>',
+    });
+    expect(s.description).toBe('Hiked Bob & Alice\'s "Loop" <Trail> #2');
+  });
+
+  it('decodes numeric hex entities and apos, and does not double-decode &amp;lt;', () => {
+    const s = summarizeFeedItem({
+      itemType: 'activity:created',
+      description: 'It&#x2019;s O&apos;Malley&#x27;s — literally &amp;lt; that',
+    });
+    expect(s.description).toBe("It’s O'Malley's — literally &lt; that");
   });
 
   it('drops empty nested objects instead of emitting {}', () => {

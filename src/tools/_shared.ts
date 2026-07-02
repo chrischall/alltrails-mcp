@@ -206,9 +206,27 @@ function prune<T extends Record<string, unknown>>(obj: T): T | undefined {
   return Object.values(obj).some((v) => v !== undefined) ? obj : undefined;
 }
 
-/** Strip HTML tags (the feed wraps trail names in anchors) and collapse whitespace. */
+// Named entities the feed can realistically emit. `&amp;` is decoded LAST so a
+// literal `&amp;lt;` correctly becomes `&lt;`, not `<`.
+const NAMED_ENTITIES: ReadonlyArray<[RegExp, string]> = [
+  [/&lt;/g, '<'],
+  [/&gt;/g, '>'],
+  [/&quot;/g, '"'],
+  [/&#39;|&apos;/g, "'"],
+  [/&nbsp;/g, ' '],
+  [/&amp;/g, '&'],
+];
+
+/**
+ * Strip HTML tags (the feed wraps trail names in anchors), decode the common
+ * entities the markup leaves behind, and collapse whitespace.
+ */
 function stripHtml(s: string): string {
-  return s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  let out = s.replace(/<[^>]*>/g, '');
+  out = out.replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)));
+  out = out.replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number(dec)));
+  for (const [pattern, replacement] of NAMED_ENTITIES) out = out.replace(pattern, replacement);
+  return out.replace(/\s+/g, ' ').trim();
 }
 
 /** Return a trimmed string, or undefined when it is null/empty/whitespace. */
@@ -273,7 +291,7 @@ export function summarizePhoto(raw: RawPhoto): PhotoSummary {
     url:
       raw.id === undefined
         ? undefined
-        : `${BASE_URL}/api/alltrails/photos/${raw.id}/image?size=large&key=${getApiKey()}`,
+        : `${BASE_URL}/api/alltrails/photos/${encodeURIComponent(raw.id)}/image?size=large&key=${encodeURIComponent(getApiKey())}`,
   };
 }
 
