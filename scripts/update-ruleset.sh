@@ -72,11 +72,16 @@ apply_ruleset "main protection (PR + ci)" '{
   ]
 }'
 
-echo "Setting squash-only merge policy"
+echo "Setting squash-only merge policy (with auto-merge enabled)"
+# allow_auto_merge rides along because the ci ruleset above makes it
+# load-bearing: without it, the pipeline's `gh pr merge --auto` fails with
+# "Auto merge is not allowed for this repository" once the required check
+# exists, and armed PRs sit green-but-open.
 gh api -X PATCH "repos/$REPO" \
   -F allow_squash_merge=true \
   -F allow_merge_commit=false \
   -F allow_rebase_merge=false \
+  -F allow_auto_merge=true \
   -F delete_branch_on_merge=true >/dev/null
 
 echo "Done. Verify with: gh api repos/$REPO/rulesets"

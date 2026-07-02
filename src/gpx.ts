@@ -87,11 +87,17 @@ export function trailToGpx(raw: OfflineTrail): string {
       const pointsData = segment.polyline?.pointsData;
       if (!pointsData) continue;
       const points = decodePolyline(pointsData, 2, 1e5);
-      const elevations = segment.polyline?.indexedElevationData
-        ? decodePolyline(segment.polyline.indexedElevationData, 2, 1e5)
-        : undefined;
+      // Map elevation by the stream's own encoded point index (pointIndex×100,
+      // decoded here as pointIndex/1000 after the shared ÷1e5), not by array
+      // position — correct even if the stream is ever sparse or offset.
+      const elevationByIndex = new Map<number, number>();
+      if (segment.polyline?.indexedElevationData) {
+        for (const [index, ele] of decodePolyline(segment.polyline.indexedElevationData, 2, 1e5)) {
+          elevationByIndex.set(Math.round(index * 1000), ele);
+        }
+      }
       const trkpts = points.map(([lat, lng], i) => {
-        const ele = elevations?.[i]?.[1];
+        const ele = elevationByIndex.get(i);
         return ele === undefined
           ? `      <trkpt lat="${lat}" lon="${lng}"/>`
           : `      <trkpt lat="${lat}" lon="${lng}"><ele>${ele}</ele></trkpt>`;
