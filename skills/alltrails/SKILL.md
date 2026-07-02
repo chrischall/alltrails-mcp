@@ -37,7 +37,7 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
 ### Discovery (no sign-in required beyond a valid session cookie)
 | Tool | Notes |
 |------|-------|
-| `alltrails_search(query?, lat?, lng?, limit?, compact?)` | Search trails by text and/or lat/lng. The endpoint can return hundreds of results regardless of `limit`, so use `compact=true` (strongly recommended) — slim summaries truncated to `limit` client-side. |
+| `alltrails_search(query?, types?, lat?, lng?, limit?, compact?)` | Search AllTrails by name. A free-text `query` uses the same suggestions endpoint as the alltrails.com search box (good relevance; may mix record types — pass `types: ["trail"]` for trails only). `lat`/`lng` are ignored by the API (results carry an implicit account/IP geo bias). Use `compact=true` (strongly recommended). |
 | `alltrails_list_trails_by_state(stateId, page?, perPage?, compact?)` | Paginated listing of trails in a state/region. `compact=true` returns a slim summary per trail (id, name, length, difficulty, rating, …) — far less output for browsing/ranking. |
 | `alltrails_list_trails_by_country(countryId, page?, perPage?, compact?)` | Paginated listing of trails in a country (e.g. `313` = US). Supports `compact`. |
 
@@ -63,7 +63,7 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
 ## Workflows
 
 **Find a trail and read reviews:**
-1. `alltrails_search(query: "waterfall trails near Portland", compact: true)` → pick a trail id
+1. `alltrails_search(query: "angels landing", types: ["trail"], compact: true)` → pick a trail id
 2. `alltrails_get_trail(trailId)` → details
 3. `alltrails_get_trail_reviews(trailId)` → what hikers say
 

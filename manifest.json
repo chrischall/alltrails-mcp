@@ -73,7 +73,7 @@
     },
     {
       "name": "alltrails_search",
-      "description": "Search trails by text and/or lat/lng"
+      "description": "Search AllTrails by trail or place name"
     },
     {
       "name": "alltrails_list_trails_by_state",
