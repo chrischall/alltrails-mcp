@@ -26,10 +26,10 @@ src/
   config.ts         env-driven header/UA/api-key/user-id/timeout/debug getters
   validate.ts       parseAllTrails(): zod validation of AllTrails responses at call sites (lenient reads / strict where a mistype must halt)
   tools/
-    _shared.ts      response helpers + resolveUserId (arg → ALLTRAILS_USER_ID → /api/alltrails/me) + summarizeTrail/fetchTrailListing (compact listing projection)
+    _shared.ts      response helpers + resolveUserId (arg → ALLTRAILS_USER_ID → /api/alltrails/me users[0].id) + the compact projections (summarizeTrail/TrailDetail/Review/Photo/SearchResult/FeedItem + their loose schemas + fetchTrailListing)
     trails.ts       get_trail, get_trail_reviews, get_trail_photos, get_trail_weather
-    explore.ts      search, list_trails_by_state, list_trails_by_country (both listings take compact?: slim per-trail summary)
-    user.ts         get_profile, list_user_lists, list_completed_trails, get_activity_feed
+    explore.ts      search, list_trails_by_state, list_trails_by_country
+    user.ts         get_profile, list_user_lists, list_completed_trails, get_activity_feed (feed?: local|timeline|personal follows the actual feed; omitted → directory)
 tests/              mirrors src/; mocks AllTrailsClient.request via vi.spyOn; auth tests mock @fetchproxy/bootstrap at the module boundary
 ```
 
@@ -79,7 +79,11 @@ Every JSON response is validated with zod at the call site via `parseAllTrails(s
 - **`x-at-key`** is a static, anonymous *app key* (not a user secret) the web/mobile client embeds. The embedded default lives in `protocol.ts`; AllTrails rotates it, so `ALLTRAILS_API_KEY` overrides and the fetchproxy path captures the live value.
 - **DataDome** anti-bot cookie (`datadome`, ~10 min TTL) is required or the API returns `403`. This is why auth reuses the browser's `Cookie` header.
 - Verified endpoints anchored on: `GET /api/alltrails/v3/trails/{id}?detail=...`, `POST /api/alltrails/v2/trails/{id}/reviews/search`, `GET /api/alltrails/v2/trails/{id}/photos`, `GET /api/alltrails/weather-service/v2/trails/{id}/overview`, `GET /api/alltrails/locations/{states|countries}/{id}/trails`, `GET /api/alltrails/me`, `GET /api/alltrails/users/{id}/{lists|trails/completed}`, `GET /api/alltrails/community/blazes/v0/users/{id}/feeds`.
-- `POST /api/alltrails/explore/v1/search` (used by `alltrails_search`) is verified to exist but its request/response body shape is **undocumented** — treat search output as best-effort and expect drift.
+- Response shapes below were captured live 2026-07-02 (via an in-browser fetchproxy bridge probe — Node replays of a captured cookie were 403'd by DataDome that day, but same-origin in-tab fetches sail through):
+  - **`GET /me`** wraps the signed-in user as `{ users: [{ id, ... }] }` (NOT `{ user: ... }` — `resolveUserId` reads `users[0].id`, keeping the other variants as drift tolerance).
+  - **`GET /v2/trails/{id}/photos`** → `{ photos: [{ id, title, description, likeCount, photoHash, user, location, metadata.created }] }`. No image URL in the record; `GET /api/alltrails/photos/{id}/image?size=large&key=<x-at-key>` (the `size` param is required) 302s to the images CDN and is **not** DataDome-walled — the compact projection derives it.
+  - **`POST /explore/v1/search`** → `{ summary: { count }, queryId, searchResults: [...], collections, boundingBox }`. Results are Algolia-formatted like the listings but `objectID` is prefixed (`"trail-{id}"`) — prefer the numeric `ID`. The body `limit` is **ignored** (500 results came back for `limit: 5`), so compact mode truncates client-side. Free-text relevance is questionable (a `q` of "angels landing" returned LA-area trails); treat as best-effort and expect drift.
+  - **`GET .../users/{id}/feeds`** returns a feed **directory** (`{ feeds: [{ name, displayName, links }], initialFeedHint }`), not items. The items live at `.../feeds/{local|timeline|personal}?maxItems=N&cursor=...` → `{ sections: [{ section_type: 'feed-item', itemData: { itemType, timestamp, description (HTML), user, trail, activity { summaryStats }, review } }], pageInfo: { hasNextPage, nextCursor } }`. Units: `summaryStats.distanceTotal`/`elevationGain` are meters, `duration` is minutes, `timeTotal`/`timeMoving` are seconds.
 
 ## Testing
 
