@@ -139,6 +139,18 @@ describe('summarizeTrailDetail', () => {
     expect(s.routeType).toBeUndefined();
     expect(s.location).toBeUndefined();
   });
+
+  it('drops a present-but-empty location object instead of emitting {}', () => {
+    // A location object whose subfields are all absent must not serialize to {}.
+    const s = summarizeTrailDetail({ id: 1, location: { city: undefined } });
+    expect(s.location).toBeUndefined();
+    expect(JSON.stringify(s)).not.toContain('location');
+  });
+
+  it('keeps location when at least one subfield is present', () => {
+    const s = summarizeTrailDetail({ id: 1, location: { city: 'Moab' } });
+    expect(s.location).toEqual({ city: 'Moab' });
+  });
 });
 
 describe('fetchTrailListing', () => {
