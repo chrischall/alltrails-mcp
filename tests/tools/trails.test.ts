@@ -118,19 +118,20 @@ describe('alltrails_get_trail_photos', () => {
     expect(client.request).toHaveBeenCalledWith('GET', '/api/alltrails/v2/trails/7/photos');
   });
 
-  it('returns a compact projection when compact=true', async () => {
-    const { handlers } = setup({
+  it('returns a compact projection when compact=true, signing image urls with the captured key', async () => {
+    const { client, handlers } = setup({
       photos: [
         { id: 1, title: 'View', likeCount: 2, user: { firstName: 'A', lastName: 'B' } },
         { id: 2, title: '' },
       ],
     });
+    vi.spyOn(client, 'currentApiKey').mockReturnValue('live-captured-key');
     const result = await handlers.get('alltrails_get_trail_photos')!({ trailId: '7', compact: true });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.count).toBe(2);
     expect(parsed.photos[0].title).toBe('View');
     expect(parsed.photos[0].user).toBe('A B');
-    expect(parsed.photos[0].url).toContain('/api/alltrails/photos/1/image?size=large&key=');
+    expect(parsed.photos[0].url).toContain('/api/alltrails/photos/1/image?size=large&key=live-captured-key');
     expect(parsed.photos[1]).toEqual({ id: '2', url: expect.stringContaining('/photos/2/image') });
   });
 

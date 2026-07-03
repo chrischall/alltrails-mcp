@@ -21,16 +21,13 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
   "mcpServers": {
     "alltrails": {
       "command": "npx",
-      "args": ["-y", "alltrails-mcp"],
-      "env": {
-        "ALLTRAILS_COOKIE": "datadome=...; _at_session=..."
-      }
+      "args": ["-y", "alltrails-mcp"]
     }
   }
 }
 ```
 
-`ALLTRAILS_COOKIE` is a Cookie header copied from a signed-in alltrails.com browser tab (DevTools → Network → any `/api/alltrails/...` request → Request Headers → Cookie). It must include the short-lived `datadome` cookie, so it needs periodic refresh. If you omit it and have the **fetchproxy** browser extension installed, the server captures the cookie automatically from your signed-in tab.
+Every API request routes through the **fetchproxy** browser bridge — it runs as a same-origin fetch inside your signed-in alltrails.com tab (DataDome fingerprints Node-originated requests, so there is no stored-cookie mode). Requirements: the fetchproxy Transporter extension installed, a signed-in alltrails.com tab open, and a one-time pair-code approval on first use. The `x-at-key` app key is never stored in code or config — it is captured live from the tab's own API traffic and held in memory only.
 
 ## Tools
 
@@ -60,6 +57,11 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
 
 `userId` defaults to the signed-in user (resolved via `/api/alltrails/me`, or `ALLTRAILS_USER_ID`).
 
+### Diagnostics
+| Tool | Notes |
+|------|-------|
+| `alltrails_healthcheck` | Round-trips a probe through the fetchproxy bridge and reports role/port/timing plus a hint distinguishing "bridge never came up" from "extension not connected" from "AllTrails-side problem". Call it when a real tool fails. |
+
 ## Workflows
 
 **Find a trail and read reviews:**
@@ -75,5 +77,5 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
 
 - All tools are **read-only** — this server never writes to AllTrails.
 - Compact summaries include both metric and imperial fields (`lengthMeters`/`lengthMiles`, `elevationGainMeters`/`elevationGainFeet`) — no unit conversion needed.
-- A `403` usually means the DataDome cookie in your session is stale — refresh a signed-in alltrails.com tab (or re-run the fetchproxy capture) and retry.
+- A `403` usually means the tab isn't signed in — sign into alltrails.com in an open tab and retry. An "AllTrails bridge:" error means the bridge itself failed — run `alltrails_healthcheck`. A key-capture stall means the tab is idle — open or refresh a www.alltrails.com page.
 - Trail/user ids are numeric strings as they appear in AllTrails URLs.

@@ -1,30 +1,15 @@
-import { parseBoolEnv as parseBoolEnvUtil, readEnvVar } from '@chrischall/mcp-utils';
-import {
-  DEFAULT_ALLTRAILS_API_KEY,
-  DEFAULT_CALLER,
-  DEFAULT_LOCALE,
-  DEFAULT_USER_AGENT,
-} from './protocol.js';
+import { parseBoolEnv as parseBoolEnvUtil, readEnvVar, readPortEnv } from '@chrischall/mcp-utils';
+import { DEFAULT_CALLER, DEFAULT_LOCALE } from './protocol.js';
 
 /**
  * True when a boolean-shaped env var is set to "1", "true", "yes", or "on"
  * (case-insensitive, trimmed). Anything else — unset, empty, or other values —
- * is false. Used for ALLTRAILS_DISABLE_FETCHPROXY, ALLTRAILS_DEBUG_LOG, etc.
+ * is false. Used for ALLTRAILS_DEBUG_LOG.
  *
  * Delegates to @chrischall/mcp-utils' `parseBoolEnv`.
  */
 export function parseBoolEnv(name: string): boolean {
   return parseBoolEnvUtil(name);
-}
-
-/**
- * The `x-at-key` app key sent on every request. Defaults to the embedded value
- * observed in the wild; override with ALLTRAILS_API_KEY when AllTrails rotates
- * it. A live value captured from the browser (auth.ts) takes precedence over
- * both — this getter is only the fallback.
- */
-export function getApiKey(): string {
-  return readEnvVar('ALLTRAILS_API_KEY') ?? DEFAULT_ALLTRAILS_API_KEY;
 }
 
 /** The `x-at-caller` header. Override with ALLTRAILS_CALLER. */
@@ -35,11 +20,6 @@ export function getCaller(): string {
 /** The `x-language-locale` header. Override with ALLTRAILS_LOCALE. */
 export function getLocale(): string {
   return readEnvVar('ALLTRAILS_LOCALE') ?? DEFAULT_LOCALE;
-}
-
-/** The browser-like `User-Agent`. Override with ALLTRAILS_USER_AGENT. */
-export function getUserAgent(): string {
-  return readEnvVar('ALLTRAILS_USER_AGENT') ?? DEFAULT_USER_AGENT;
 }
 
 /**
@@ -62,6 +42,14 @@ export function getRequestTimeoutMs(): number {
   if (typeof raw !== 'string' || raw.trim().length === 0) return DEFAULT_REQUEST_TIMEOUT_MS;
   const n = Number(raw.trim());
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
+// The fetchproxy concentrator port. The whole fleet (and the Transporter
+// extension) shares 37149; override with ALLTRAILS_WS_PORT only for local
+// development or test isolation.
+const DEFAULT_WS_PORT = 37_149;
+export function getWsPort(): number {
+  return readPortEnv('ALLTRAILS_WS_PORT', DEFAULT_WS_PORT);
 }
 
 // Set ALLTRAILS_DEBUG_LOG=1 (or true/yes/on) to log every request/response to

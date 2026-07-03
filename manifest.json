@@ -34,19 +34,11 @@
         "${__dirname}/dist/bundle.js"
       ],
       "env": {
-        "ALLTRAILS_COOKIE": "${user_config.alltrails_cookie}",
         "ALLTRAILS_USER_ID": "${user_config.alltrails_user_id}"
       }
     }
   },
   "user_config": {
-    "alltrails_cookie": {
-      "type": "string",
-      "title": "AllTrails Cookie header",
-      "description": "A Cookie header copied from a signed-in alltrails.com browser tab (must include the short-lived datadome cookie). Optional — if omitted, the server falls back to the fetchproxy browser extension (requires being signed in to alltrails.com in your browser).",
-      "required": false,
-      "sensitive": true
-    },
     "alltrails_user_id": {
       "type": "string",
       "title": "AllTrails user id",
@@ -98,6 +90,10 @@
     {
       "name": "alltrails_get_activity_feed",
       "description": "Get a user's activity feed"
+    },
+    {
+      "name": "alltrails_healthcheck",
+      "description": "Verify the fetchproxy bridge end-to-end"
     }
   ],
   "compatibility": {
