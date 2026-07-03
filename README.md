@@ -26,7 +26,7 @@ Ask Claude things like:
 
 - [Claude Desktop](https://claude.ai/download) (or any MCP host)
 - [Node.js](https://nodejs.org) 22.5 or later
-- A signed-in AllTrails browser session (see [Authentication](#authentication))
+- The [fetchproxy Transporter](https://github.com/chrischall/fetchproxy) browser extension and a signed-in alltrails.com tab (see [Authentication](#authentication))
 
 ## Acknowledgement of Terms
 
@@ -67,10 +67,7 @@ Add the `alltrails` entry inside `"mcpServers"` (create the key if it doesn't ex
   "mcpServers": {
     "alltrails": {
       "command": "node",
-      "args": ["/absolute/path/to/alltrails-mcp/dist/index.js"],
-      "env": {
-        "ALLTRAILS_COOKIE": "datadome=...; _at_session=..."
-      }
+      "args": ["/absolute/path/to/alltrails-mcp/dist/index.js"]
     }
   }
 }
@@ -88,22 +85,24 @@ Ask Claude: *"Search AllTrails for trails near me."*
 
 ## Authentication
 
-AllTrails fronts its internal API with DataDome bot protection, so requests must carry the exact `Cookie` header a real signed-in browser sends — it includes a short-lived `datadome` anti-bot cookie plus (for per-user data) your login session. The server resolves that cookie via two paths, whichever succeeds first:
+AllTrails fronts its internal API with DataDome bot protection, and DataDome fingerprints the HTTP client itself — a cookie copied out of the browser and replayed from Node can be rejected even while the browser sails through. So this server routes every API request through the [fetchproxy](https://github.com/chrischall/fetchproxy) bridge: each request runs as a same-origin fetch inside your own signed-in alltrails.com tab, reusing your authenticated session. Two paths, in priority order:
 
-1. **`ALLTRAILS_COOKIE` env var (explicit).** Paste a Cookie header captured from your browser: open DevTools → Network on alltrails.com, click any `/api/alltrails/...` request, and copy the `Cookie` request header. Because the `datadome` cookie is short-lived, this needs periodic refresh.
-2. **fetchproxy fallback (automatic).** With the [fetchproxy](https://github.com/chrischall/fetchproxy) browser extension installed and signed into alltrails.com, the server captures the `cookie` (and live `x-at-key`) request header once from your signed-in tab, then operates from Node directly — the extension is **not** in the request hot path. Set `ALLTRAILS_DISABLE_FETCHPROXY=1` to turn a missing cookie into a hard error (useful in headless CI).
+1. **`ALLTRAILS_COOKIE` env var (escape hatch).** Paste a Cookie header captured from your browser (DevTools → Network on alltrails.com → any `/api/alltrails/...` request → the `Cookie` request header). Requests go out from Node directly with that header — useful for CI or hosts without the extension, but best-effort: the `datadome` cookie is short-lived, and DataDome may reject Node-originated requests regardless.
+2. **fetchproxy bridge (primary).** With the fetchproxy Transporter extension installed and a signed-in alltrails.com tab open, requests run inside that tab. On first use the extension shows a pair code — approve it once and the trust persists. Set `ALLTRAILS_DISABLE_FETCHPROXY=1` to opt out (a missing cookie then becomes a hard error).
 
-If neither is available, the server throws with both fixes spelled out.
+If the bridge is disabled and no cookie is set, the server throws with both fixes spelled out. The `alltrails_healthcheck` tool round-trips a probe through the bridge and tells you which hop broke.
 
 ### Configuration
 
 | Env var | Required | Purpose |
 |---------|----------|---------|
-| `ALLTRAILS_COOKIE` | No | Cookie header from a signed-in alltrails.com session (must include `datadome`). |
+| `ALLTRAILS_COOKIE` | No | Cookie header from a signed-in alltrails.com session (must include `datadome`) — switches to Node-direct requests, bypassing the bridge. |
 | `ALLTRAILS_USER_ID` | No | Numeric user id for the per-user tools; defaults to the signed-in user via `/api/alltrails/me`. |
-| `ALLTRAILS_DISABLE_FETCHPROXY` | No | `1`/`true`/`yes`/`on` skips the fetchproxy fallback. |
+| `ALLTRAILS_DISABLE_FETCHPROXY` | No | `1`/`true`/`yes`/`on` disables the bridge (a missing cookie is then a hard error). |
+| `ALLTRAILS_WS_PORT` | No | fetchproxy concentrator port (default `37149`, shared by the whole fetchproxy fleet — override only for local dev/tests). |
 | `ALLTRAILS_API_KEY` | No | Overrides the embedded `x-at-key` app key if AllTrails rotates it. |
-| `ALLTRAILS_LOCALE` / `ALLTRAILS_CALLER` / `ALLTRAILS_USER_AGENT` | No | Override the corresponding request headers. |
+| `ALLTRAILS_LOCALE` / `ALLTRAILS_CALLER` / `ALLTRAILS_USER_AGENT` | No | Override the corresponding request headers (`ALLTRAILS_USER_AGENT` only affects the cookie escape hatch — the browser owns the UA in bridge mode). |
+| `ALLTRAILS_REQUEST_TIMEOUT_MS` | No | Per-request timeout in ms (default `30000`), applied on both paths. |
 | `ALLTRAILS_DEBUG_LOG` | No | `1`/`true`/`yes`/`on` logs every request/response to stderr (Cookie redacted). |
 
 ## Available tools
@@ -124,14 +123,17 @@ All tools are **read-only** — this server never writes to AllTrails.
 | `alltrails_list_user_lists` | A user's saved lists / favorites |
 | `alltrails_list_completed_trails` | A user's completed trails |
 | `alltrails_get_activity_feed` | A user's activity feed (`feed`: `local`/`timeline`/`personal` for the items, omit for the directory; `cursor` paginates; `compact` for slim items) |
+| `alltrails_healthcheck` | Round-trips a probe through the fetchproxy bridge and reports role/port/timing plus a plain-English hint about which hop broke |
 
 The per-user tools default to the signed-in user (resolved via `/api/alltrails/me` or `ALLTRAILS_USER_ID`); pass `userId` to target a public profile.
 
 ## Troubleshooting
 
-**403 Forbidden** — AllTrails' DataDome protection rejected the request, usually because the `datadome` cookie in your captured session went stale. Refresh a signed-in alltrails.com tab (or re-run the fetchproxy capture) and retry.
+**403 Forbidden** — AllTrails' DataDome protection rejected the request. In bridge mode this usually means the tab isn't signed in (or DataDome is challenging it) — sign into alltrails.com in an open tab and retry. With `ALLTRAILS_COOKIE`, the cookie is likely stale (the `datadome` cookie lives ~10 minutes) or DataDome is rejecting Node-originated traffic outright — prefer the bridge.
 
-**"AllTrails auth: set ALLTRAILS_COOKIE…"** — neither auth path is configured. Either set `ALLTRAILS_COOKIE` in your config, or install the [fetchproxy extension](https://github.com/chrischall/fetchproxy) and sign into alltrails.com.
+**"AllTrails bridge: …"** — the bridge itself failed before reaching AllTrails (extension not running, pairing not approved, no tab). Run `alltrails_healthcheck` for a diagnosis, and check the Transporter extension popup.
+
+**"AllTrails auth: set ALLTRAILS_COOKIE…"** — the bridge is disabled (`ALLTRAILS_DISABLE_FETCHPROXY`) and no cookie is set. Either unset the disable flag and install the [fetchproxy extension](https://github.com/chrischall/fetchproxy), or set `ALLTRAILS_COOKIE`.
 
 **Empty / unexpected results** — the internal AllTrails endpoints are undocumented and change over time; responses may shift. Enable `ALLTRAILS_DEBUG_LOG=1` to inspect the raw traffic on stderr.
 
@@ -150,27 +152,23 @@ npm run dev      # node --env-file=.env dist/index.js (requires built dist)
 ```
 src/
   index.ts          MCP server entry (runMcp + StdioServerTransport)
-  protocol.ts       Wire-level constants (BASE_URL, app key, headers, TTL)
-  client.ts         AllTrailsClient — cookie-session auth, 401/403 re-capture, 429 retry
-  auth.ts           resolveAuth(): env cookie → fetchproxy capture → error
-  config.ts         Env parsing (api key, headers, timeout, user id, debug)
+  protocol.ts       Wire-level constants (BASE_URL, app key, headers)
+  transport.ts      createAllTrailsTransport(): the fetchproxy bridge transport
+  client.ts         AllTrailsClient — bridge hot path, ALLTRAILS_COOKIE escape hatch, 429 retry
+  config.ts         Env parsing (api key, headers, timeout, port, user id, debug)
   validate.ts       parseAllTrails(): zod validation of responses at call sites
   tools/
     _shared.ts      Response helpers + resolveUserId
     trails.ts       get_trail, reviews, photos, weather, gpx export
     explore.ts      search, list by state/country
     user.ts         profile, saved lists, completed trails, activity feed
+    healthcheck.ts  alltrails_healthcheck (bridge diagnostics)
 tests/              Mirrors src/; mocks AllTrailsClient.request via vi.spyOn
 ```
 
-### Auth flow
+### Request flow
 
-Auth resolution lives in `src/auth.ts`. Two paths, in priority order (then error):
-
-1. **`ALLTRAILS_COOKIE` set** → used verbatim as the `Cookie:` header.
-2. **fetchproxy** → `@fetchproxy/bootstrap` captures the `cookie` + `x-at-key` request headers once from your signed-in `www.alltrails.com/api/alltrails/*` traffic, then closes the bridge.
-
-The resolved cookie session is managed by the fleet's `CookieSessionManager` (single-flight login, reactive re-capture on a `401`/`403`, one replay). All API calls then go out from Node directly — fetchproxy is **not** in the request hot path.
+Every API request runs as a same-origin fetch inside your signed-in alltrails.com tab, via the fetchproxy bridge (`src/transport.ts`, the shared `createFetchproxyTransport` factory). The browser carries its own cookies; the server attaches only the AllTrails protocol headers (`x-at-key` etc.), which an in-tab fetch doesn't add on its own. `ALLTRAILS_COOKIE` switches to a direct Node fetch instead — no bridge, best-effort against DataDome.
 
 Also see the [fetchproxy README](https://github.com/chrischall/fetchproxy) for extension install instructions.
 

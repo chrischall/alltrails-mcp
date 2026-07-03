@@ -24,7 +24,9 @@ export function registerHealthcheckTools(server: McpServer, client: AllTrailsCli
     probePath: HEALTHCHECK_PROBE_PATH,
     hostLabel: 'www.alltrails.com',
     transport: {
-      runProbe: (fetchFn, probePath) => client.bridge().runProbe(fetchFn, probePath),
+      // runProbe must go through the STARTED transport (start() loads the
+      // identity and must precede any verb), hence the async delegate.
+      runProbe: async (fetchFn, probePath) => (await client.bridgeReady()).runProbe(fetchFn, probePath),
       status: () => client.bridge().status(),
     },
     probeFn: (path) => client.request<unknown>('GET', path).then((r) => JSON.stringify(r)),

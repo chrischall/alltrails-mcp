@@ -43,7 +43,7 @@
     "alltrails_cookie": {
       "type": "string",
       "title": "AllTrails Cookie header",
-      "description": "A Cookie header copied from a signed-in alltrails.com browser tab (must include the short-lived datadome cookie). Optional — if omitted, the server falls back to the fetchproxy browser extension (requires being signed in to alltrails.com in your browser).",
+      "description": "Optional escape hatch: a Cookie header copied from a signed-in alltrails.com browser tab (must include the short-lived datadome cookie), sent via direct Node requests. If omitted (recommended), every request routes through your signed-in alltrails.com tab via the fetchproxy browser extension.",
       "required": false,
       "sensitive": true
     },
@@ -98,6 +98,10 @@
     {
       "name": "alltrails_get_activity_feed",
       "description": "Get a user's activity feed"
+    },
+    {
+      "name": "alltrails_healthcheck",
+      "description": "Verify the fetchproxy bridge end-to-end"
     }
   ],
   "compatibility": {

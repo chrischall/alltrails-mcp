@@ -83,6 +83,7 @@ function protocolHeaders(hasBody: boolean): Record<string, string> {
 
 export class AllTrailsClient {
   private transport: FetchproxyTransport | undefined;
+  private startPromise: Promise<void> | undefined;
 
   constructor(private readonly injected: { transport?: FetchproxyTransport } = {}) {}
 
@@ -96,6 +97,25 @@ export class AllTrailsClient {
       this.transport = this.injected.transport ?? createAllTrailsTransport();
     }
     return this.transport;
+  }
+
+  /**
+   * The bridge transport, started. `start()` loads the identity keypair and
+   * must precede the first verb call; it runs single-flight (concurrent
+   * callers share one start) and clears on rejection so a transient failure
+   * (e.g. an unwritable identity dir) is retried on the next request instead
+   * of sticking forever.
+   */
+  async bridgeReady(): Promise<FetchproxyTransport> {
+    const transport = this.bridge();
+    if (!this.startPromise) {
+      this.startPromise = transport.start().catch((e: unknown) => {
+        this.startPromise = undefined;
+        throw e;
+      });
+    }
+    await this.startPromise;
+    return transport;
   }
 
   /** Issue an authenticated JSON request and parse the response body. */
@@ -178,7 +198,8 @@ export class AllTrailsClient {
     }
     let result: { status: number; body: string };
     try {
-      result = await this.bridge().fetch({
+      const transport = await this.bridgeReady();
+      result = await transport.fetch({
         method: method as 'GET' | 'POST' | 'PUT' | 'DELETE',
         path,
         headers,

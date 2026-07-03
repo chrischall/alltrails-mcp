@@ -18,7 +18,7 @@
       "environmentVariables": [
         {
           "name": "ALLTRAILS_COOKIE",
-          "description": "A Cookie header from a signed-in alltrails.com browser session (must include the datadome cookie). Optional — if omitted, the server falls back to the fetchproxy browser extension (requires being signed in to alltrails.com).",
+          "description": "Optional escape hatch: a Cookie header from a signed-in alltrails.com session (must include the datadome cookie), sent via direct Node requests. Default (omitted): every request routes through the user's signed-in alltrails.com tab via the fetchproxy browser extension.",
           "isRequired": false,
           "format": "string",
           "isSecret": true

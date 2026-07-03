@@ -14,12 +14,13 @@ interface BridgeResponse {
 
 function stubTransport(responses: (BridgeResponse | Error)[]) {
   let idx = 0;
+  const start = vi.fn(async () => {});
   const fetch = vi.fn(async () => {
     const r = responses[idx++] ?? { status: 200, body: '{}' };
     if (r instanceof Error) throw r;
     return { status: r.status, body: r.body ?? '{}', url: 'https://www.alltrails.com/x' };
   });
-  return { transport: { fetch } as unknown as FetchproxyTransport, fetch };
+  return { transport: { start, fetch } as unknown as FetchproxyTransport, fetch, start };
 }
 
 // ── Node-path fetch mock (env-cookie escape hatch) ──────────────────────────
@@ -190,6 +191,31 @@ describe('AllTrailsClient — bridge path (default)', () => {
     await expect(new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x')).rejects.toThrow(
       /AllTrails bridge.*weird wire failure/,
     );
+  });
+
+  it('starts the transport exactly once before the first verb (listen() must precede fetch)', async () => {
+    const { transport, fetch, start } = stubTransport([
+      { status: 200, body: '{}' },
+      { status: 200, body: '{}' },
+    ]);
+    const client = new AllTrailsClient({ transport });
+    await client.request('GET', '/api/alltrails/a');
+    await client.request('GET', '/api/alltrails/b');
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(start.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[0]);
+  });
+
+  it('retries start() on the next request after a failed start', async () => {
+    const start = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('identity dir unwritable'))
+      .mockResolvedValue(undefined);
+    const fetch = vi.fn(async () => ({ status: 200, body: '{"ok":1}', url: 'u' }));
+    const transport = { start, fetch } as unknown as FetchproxyTransport;
+    const client = new AllTrailsClient({ transport });
+    await expect(client.request('GET', '/api/alltrails/x')).rejects.toThrow(/identity dir unwritable/);
+    expect(await client.request('GET', '/api/alltrails/x')).toEqual({ ok: 1 });
+    expect(start).toHaveBeenCalledTimes(2);
   });
 
   it('creates the real transport lazily exactly once', async () => {

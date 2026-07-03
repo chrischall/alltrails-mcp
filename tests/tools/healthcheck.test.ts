@@ -27,7 +27,8 @@ function setup() {
     return PROBE_RESULT;
   });
   const status = vi.fn(() => ({ lastExtensionMessageAt: 123 }));
-  const transport = { runProbe, status } as unknown as FetchproxyTransport;
+  const start = vi.fn(async () => {});
+  const transport = { start, runProbe, status } as unknown as FetchproxyTransport;
   const client = new AllTrailsClient({ transport });
   const requestSpy = vi.spyOn(client, 'request').mockResolvedValue({ trails: [] });
 
