@@ -27,7 +27,7 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
 }
 ```
 
-Every API request routes through the **fetchproxy** browser bridge: it runs as a same-origin fetch inside your signed-in alltrails.com tab (DataDome fingerprints Node-originated requests, so a copied cookie alone is not reliable). Requirements: the fetchproxy Transporter extension installed, a signed-in alltrails.com tab open, and a one-time pair-code approval on first use. The `x-at-key` app key is never stored in code or config — it is captured live from the tab's own API traffic and held in memory only. `ALLTRAILS_COOKIE` (a Cookie header copied from DevTools) switches the API calls themselves to best-effort Node-direct requests, but the extension is still required for the key capture.
+Every API request routes through the **fetchproxy** browser bridge — it runs as a same-origin fetch inside your signed-in alltrails.com tab (DataDome fingerprints Node-originated requests, so there is no stored-cookie mode). Requirements: the fetchproxy Transporter extension installed, a signed-in alltrails.com tab open, and a one-time pair-code approval on first use. The `x-at-key` app key is never stored in code or config — it is captured live from the tab's own API traffic and held in memory only.
 
 ## Tools
 
@@ -77,5 +77,5 @@ Every API request routes through the **fetchproxy** browser bridge: it runs as a
 
 - All tools are **read-only** — this server never writes to AllTrails.
 - Compact summaries include both metric and imperial fields (`lengthMeters`/`lengthMiles`, `elevationGainMeters`/`elevationGainFeet`) — no unit conversion needed.
-- A `403` usually means the tab isn't signed in (or, with `ALLTRAILS_COOKIE`, the cookie went stale) — sign into alltrails.com in an open tab and retry. An "AllTrails bridge:" error means the bridge itself failed — run `alltrails_healthcheck`.
+- A `403` usually means the tab isn't signed in — sign into alltrails.com in an open tab and retry. An "AllTrails bridge:" error means the bridge itself failed — run `alltrails_healthcheck`. A key-capture stall means the tab is idle — open or refresh a www.alltrails.com page.
 - Trail/user ids are numeric strings as they appear in AllTrails URLs.

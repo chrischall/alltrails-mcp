@@ -90,7 +90,13 @@ Bridge-path details:
 - Dependency `@fetchproxy/bootstrap` (replaced by direct dep `@fetchproxy/server`,
   which `@chrischall/mcp-utils/fetchproxy` peers on; already ≥ the 0.11 floor).
 
-**Amendment (same day, user directive):** the app key is never stored in code or
+**Amendment 2 (same day, user directive):** the `ALLTRAILS_COOKIE` stored-cookie
+route is removed entirely — the fetchproxy bridge is required, with no Node-direct
+mode. `ALLTRAILS_DISABLE_FETCHPROXY` and `ALLTRAILS_USER_AGENT` (both existed for
+the Node path) are removed with it, along with `AllTrailsConfigError` and the
+Node fetch/timeout/Retry-After machinery.
+
+**Amendment 1 (same day, user directive):** the app key is never stored in code or
 config. `DEFAULT_ALLTRAILS_API_KEY` and `ALLTRAILS_API_KEY` are removed; the client
 captures the live `x-at-key` from the tab's own API traffic (`captureRequestHeader`)
 on first need, holds it in process memory only, and re-captures reactively on the

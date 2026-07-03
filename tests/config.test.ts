@@ -3,25 +3,18 @@ import {
   parseBoolEnv,
   getCaller,
   getLocale,
-  getUserAgent,
   getConfiguredUserId,
   getRequestTimeoutMs,
   debugLogEnabled,
 } from '../src/config.js';
-import {
-  DEFAULT_CALLER,
-  DEFAULT_LOCALE,
-  DEFAULT_USER_AGENT,
-} from '../src/protocol.js';
+import { DEFAULT_CALLER, DEFAULT_LOCALE } from '../src/protocol.js';
 
 const TOUCHED = [
   'ALLTRAILS_CALLER',
   'ALLTRAILS_LOCALE',
-  'ALLTRAILS_USER_AGENT',
   'ALLTRAILS_USER_ID',
   'ALLTRAILS_REQUEST_TIMEOUT_MS',
   'ALLTRAILS_DEBUG_LOG',
-  'ALLTRAILS_DISABLE_FETCHPROXY',
 ];
 
 afterEach(() => {
@@ -30,33 +23,30 @@ afterEach(() => {
 
 describe('parseBoolEnv', () => {
   it.each(['1', 'true', 'yes', 'on', 'TRUE'])('is true for %j', (v) => {
-    process.env.ALLTRAILS_DISABLE_FETCHPROXY = v;
-    expect(parseBoolEnv('ALLTRAILS_DISABLE_FETCHPROXY')).toBe(true);
+    process.env.ALLTRAILS_DEBUG_LOG = v;
+    expect(parseBoolEnv('ALLTRAILS_DEBUG_LOG')).toBe(true);
   });
 
   it.each(['0', 'false', 'no', 'off', '', 'garbage'])('is false for %j', (v) => {
-    process.env.ALLTRAILS_DISABLE_FETCHPROXY = v;
-    expect(parseBoolEnv('ALLTRAILS_DISABLE_FETCHPROXY')).toBe(false);
+    process.env.ALLTRAILS_DEBUG_LOG = v;
+    expect(parseBoolEnv('ALLTRAILS_DEBUG_LOG')).toBe(false);
   });
 
   it('is false when unset', () => {
-    expect(parseBoolEnv('ALLTRAILS_DISABLE_FETCHPROXY')).toBe(false);
+    expect(parseBoolEnv('ALLTRAILS_DEBUG_LOG')).toBe(false);
   });
 });
 
-describe('getCaller / getLocale / getUserAgent', () => {
+describe('getCaller / getLocale', () => {
   it('return defaults when unset', () => {
     expect(getCaller()).toBe(DEFAULT_CALLER);
     expect(getLocale()).toBe(DEFAULT_LOCALE);
-    expect(getUserAgent()).toBe(DEFAULT_USER_AGENT);
   });
   it('return overrides when set', () => {
     process.env.ALLTRAILS_CALLER = 'MyCaller';
     process.env.ALLTRAILS_LOCALE = 'fr-FR';
-    process.env.ALLTRAILS_USER_AGENT = 'CustomUA/1.0';
     expect(getCaller()).toBe('MyCaller');
     expect(getLocale()).toBe('fr-FR');
-    expect(getUserAgent()).toBe('CustomUA/1.0');
   });
 });
 

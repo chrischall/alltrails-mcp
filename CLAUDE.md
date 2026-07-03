@@ -22,7 +22,7 @@ src/
   index.ts          MCP server entry — runMcp() from @chrischall/mcp-utils (builds McpServer, applies registrars with client as deps, prints banner, wires shutdown + stdio transport)
   protocol.ts       Wire-level constants (BASE_URL, embedded x-at-key app key, header/UA defaults)
   transport.ts      createAllTrailsTransport(): the fetchproxy bridge transport (createFetchproxyTransport, port 37149, domains alltrails.com, defaultSubdomain www, createServer test seam)
-  client.ts         AllTrailsClient — bridge hot path (transport.fetch inside the signed-in tab) + ALLTRAILS_COOKIE Node-direct escape hatch, 429 wait-and-replay, non-JSON interstitial guard, AllTrailsConfigError
+  client.ts         AllTrailsClient — bridge requests (transport.fetch inside the signed-in tab), live x-at-key capture (memory-only), 429 wait-and-replay, non-JSON interstitial guard
   config.ts         env-driven header/UA/api-key/user-id/timeout/ws-port/debug getters
   validate.ts       parseAllTrails(): zod validation of AllTrails responses at call sites (lenient reads / strict where a mistype must halt)
   gpx.ts            decodePolyline() (generalized Google polyline varint decoder) + trailToGpx() (offline-detail route geometry → GPX 1.1) + OfflineTrailSchema
@@ -40,32 +40,25 @@ Tool files use `server.registerTool(name, schema, handler)` and export `register
 ## Environment
 
 ```
-ALLTRAILS_COOKIE              Optional. Cookie header from a signed-in alltrails.com session (must include the short-lived datadome cookie). Switches to Node-direct requests, bypassing the bridge — CI/headless escape hatch, best-effort vs DataDome
-ALLTRAILS_DISABLE_FETCHPROXY  Optional. "1|true|yes|on" → disable the bridge (missing cookie becomes a hard AllTrailsConfigError)
 ALLTRAILS_WS_PORT             Optional. fetchproxy concentrator port (default 37149 — the WHOLE fleet + the Transporter extension share it; override only for local dev/test isolation)
 ALLTRAILS_USER_ID             Optional. Numeric user id for the per-user tools; skips the /api/alltrails/me lookup (or targets another public profile)
 ALLTRAILS_CALLER              Optional. Overrides the x-at-caller header (default "Mugen")
 ALLTRAILS_LOCALE              Optional. Overrides the x-language-locale header (default "en-US")
-ALLTRAILS_USER_AGENT          Optional. Overrides the browser-like User-Agent (cookie escape hatch only — the browser owns the UA in bridge mode)
-ALLTRAILS_REQUEST_TIMEOUT_MS  Optional. Per-request timeout in ms (default 30000). Drives both the Node-path AbortController and the bridge's fetchTimeoutMs
-ALLTRAILS_DEBUG_LOG           Optional. "1|true|yes|on" → log every request/response to stderr (Cookie redacted); also enables the bridge transport's per-request debug logging. Diagnostic only
+ALLTRAILS_REQUEST_TIMEOUT_MS  Optional. Per-request timeout in ms (default 30000). Forwarded as the bridge's fetchTimeoutMs
+ALLTRAILS_DEBUG_LOG           Optional. "1|true|yes|on" → log every request/response to stderr; also enables the bridge transport's per-request debug logging. Diagnostic only
 ```
 
 `config.ts` reads env vars through `readEnvVar`/`readPortEnv`, which treat blank values, the strings `"undefined"`/`"null"`, and unsubstituted `${VAR}` placeholders as unset — defensive against MCP hosts passing the env block through unexpanded.
 
 `.env` (project root) is loaded by `client.ts` via `loadDotenvSafely` (silently skipped if dotenv is unavailable, e.g. inside the mcpb bundle). Real env vars take precedence.
 
-## Request routing (fetchproxy archetype — bridge in the hot path)
+## Request routing (fetchproxy archetype — bridge required, no fallback)
 
-AllTrails has **no username/password → token exchange**, and DataDome fingerprints the HTTP client itself (TLS/JA3): a cookie captured from the browser and replayed from Node gets `403`'d even while the identical same-origin fetch inside the signed-in tab returns 200 (verified live 2026-07-02). So this repo follows the fleet's **fetchproxy archetype** (redfin/zillow), not the bootstrap-capture pattern: **every API request runs as a same-origin fetch inside the user's signed-in alltrails.com tab** via `createFetchproxyTransport` (`src/transport.ts` — port 37149, `domains: ['alltrails.com']`, `defaultSubdomain: 'www'`).
+AllTrails has **no username/password → token exchange**, and DataDome fingerprints the HTTP client itself (TLS/JA3): a cookie captured from the browser and replayed from Node gets `403`'d even while the identical same-origin fetch inside the signed-in tab returns 200 (verified live 2026-07-02). So this repo follows the fleet's **fetchproxy archetype** (redfin/zillow) with **no stored-cookie escape hatch**: **every API request runs as a same-origin fetch inside the user's signed-in alltrails.com tab** via `createFetchproxyTransport` (`src/transport.ts` — port 37149, `domains: ['alltrails.com']`, `defaultSubdomain: 'www'`).
 
-`AllTrailsClient.request` routes each call, in priority order:
+`AllTrailsClient.request` → `transport.fetch({ method, path, headers, body })`. The browser owns `Cookie`/`User-Agent`/`Origin`; the client attaches only the protocol headers (`Accept`/`x-at-key`/`x-at-caller`/`x-language-locale`, plus `Content-Type` with a body) because an in-tab fetch does NOT add them (missing `x-at-key` → 400). Bridge-layer failures (extension down, pairing pending) are wrapped with `bridgeErrorInfo`'s remediation hint.
 
-1. **`ALLTRAILS_COOKIE` set** → direct Node `fetch` with that Cookie plus browser-shaped headers (`User-Agent`/`Origin`/`Referer`/`Sec-Fetch-Site`). Escape hatch only; there is nothing to re-capture, so a 401/403 surfaces directly with a stale-cookie hint.
-2. **`ALLTRAILS_DISABLE_FETCHPROXY`** (and no cookie) → `AllTrailsConfigError` naming both fixes.
-3. **Bridge (primary)** → `transport.fetch({ method, path, headers, body })`. The browser owns `Cookie`/`User-Agent`/`Origin`; the client attaches only the protocol headers (`Accept`/`x-at-key`/`x-at-caller`/`x-language-locale`, plus `Content-Type` with a body) because an in-tab fetch does NOT add them (missing `x-at-key` → 400). Bridge-layer failures (extension down, pairing pending) are wrapped with `bridgeErrorInfo`'s remediation hint.
-
-Shared handling in the client: `429` → wait and replay once (`Retry-After` honored, capped 30s, on the Node path; fixed 2s on the bridge path — bridge results carry no headers), then throw. Non-2xx → throw (`401`/`403` get a path-appropriate DataDome hint). A 2xx non-JSON body is a DataDome interstitial → actionable error, never a bare SyntaxError.
+Response handling: `429` → wait 2s and replay once (bridge results carry no headers, so no `Retry-After`), then throw. `400`/`401` → the rotation signature: re-capture the app key (discarding values equal to the stale one) and replay once if a genuinely fresh key arrived; otherwise surface the original error. Non-2xx → throw (`401`/`403` get a signed-in-tab hint). A 2xx non-JSON body is a DataDome interstitial → actionable error, never a bare SyntaxError.
 
 Onboarding: first bridge use shows a pair code in the Transporter extension popup (one-time, persists per identity). A signed-in alltrails.com tab must be open. `alltrails_healthcheck` diagnoses which hop broke.
 
@@ -144,7 +137,7 @@ skills/alltrails/SKILL.md   Claude Code skill describing when/how to use the too
 
 - **ESM + NodeNext**: imports must use `.js` extensions even for `.ts` sources (e.g. `import { client } from './client.js'`).
 - **stdio transport**: stdout is reserved for JSON-RPC. All logging goes to **stderr** (`console.error`).
-- **Bridge in the hot path, not a credential**: unlike the token-based siblings there is no resolved credential at all — the signed-in tab IS the session. The `ALLTRAILS_COOKIE` escape hatch is best-effort (DataDome may 403 Node-originated requests regardless of cookie freshness).
+- **Bridge required, no credential**: unlike the token-based siblings there is no resolved credential and no stored-cookie fallback — the signed-in tab IS the session, and DataDome 403s Node-originated requests regardless of cookie freshness.
 - **Port 37149 is fleet-shared**: the Transporter extension dials that one concentrator port; never default this MCP to a different one.
 - **Read-only**: no write tools exist. Keep it that way unless AllTrails write endpoints are actually needed and verified.
 - **AI-maintained**: README warns this codebase is built and maintained by Claude; `src/index.ts` prints the same notice (plus the unofficial/ToS caveat) to stderr on startup.

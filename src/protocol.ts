@@ -20,13 +20,6 @@
 
 export const BASE_URL = 'https://www.alltrails.com';
 
-// A browser-like User-Agent. AllTrails' bot protection rejects obvious
-// non-browser agents, so we present a recent desktop Chrome UA by default.
-// Overridable via ALLTRAILS_USER_AGENT.
-export const DEFAULT_USER_AGENT =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-  '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-
 // Client-identifier header the web app sends alongside `x-at-key`. Observed as
 // the constant value below; overridable via ALLTRAILS_CALLER.
 export const DEFAULT_CALLER = 'Mugen';

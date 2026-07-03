@@ -2,10 +2,7 @@
   "mcpServers": {
     "alltrails": {
       "command": "npx",
-      "args": ["-y", "alltrails-mcp"],
-      "env": {
-        "ALLTRAILS_COOKIE": "${ALLTRAILS_COOKIE}"
-      }
+      "args": ["-y", "alltrails-mcp"]
     }
   }
 }

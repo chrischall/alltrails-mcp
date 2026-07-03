@@ -1,10 +1,10 @@
 import { parseBoolEnv as parseBoolEnvUtil, readEnvVar, readPortEnv } from '@chrischall/mcp-utils';
-import { DEFAULT_CALLER, DEFAULT_LOCALE, DEFAULT_USER_AGENT } from './protocol.js';
+import { DEFAULT_CALLER, DEFAULT_LOCALE } from './protocol.js';
 
 /**
  * True when a boolean-shaped env var is set to "1", "true", "yes", or "on"
  * (case-insensitive, trimmed). Anything else — unset, empty, or other values —
- * is false. Used for ALLTRAILS_DISABLE_FETCHPROXY, ALLTRAILS_DEBUG_LOG, etc.
+ * is false. Used for ALLTRAILS_DEBUG_LOG.
  *
  * Delegates to @chrischall/mcp-utils' `parseBoolEnv`.
  */
@@ -20,11 +20,6 @@ export function getCaller(): string {
 /** The `x-language-locale` header. Override with ALLTRAILS_LOCALE. */
 export function getLocale(): string {
   return readEnvVar('ALLTRAILS_LOCALE') ?? DEFAULT_LOCALE;
-}
-
-/** The browser-like `User-Agent`. Override with ALLTRAILS_USER_AGENT. */
-export function getUserAgent(): string {
-  return readEnvVar('ALLTRAILS_USER_AGENT') ?? DEFAULT_USER_AGENT;
 }
 
 /**
