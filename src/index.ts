@@ -4,6 +4,7 @@ import { client } from './client.js';
 import { registerTrailTools } from './tools/trails.js';
 import { registerExploreTools } from './tools/explore.js';
 import { registerUserTools } from './tools/user.js';
+import { registerHealthcheckTools } from './tools/healthcheck.js';
 
 // runMcp builds the McpServer, applies the registrars (with `client` threaded
 // through as deps), prints the banner to stderr, wires SIGINT/SIGTERM graceful
@@ -15,7 +16,7 @@ await runMcp({
   name: 'alltrails',
   version: '0.3.0', // x-release-please-version
   deps: client,
-  tools: [registerTrailTools, registerExploreTools, registerUserTools],
+  tools: [registerTrailTools, registerExploreTools, registerUserTools, registerHealthcheckTools],
   banner:
     '[alltrails-mcp] Unofficial AllTrails MCP. AllTrails has no public API; this reverse-engineers ' +
     'the internal one and may break or violate their ToS. Developed and maintained by AI (Claude). Use at your own discretion.',

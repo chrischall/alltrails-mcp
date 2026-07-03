@@ -1,4 +1,4 @@
-import { parseBoolEnv as parseBoolEnvUtil, readEnvVar } from '@chrischall/mcp-utils';
+import { parseBoolEnv as parseBoolEnvUtil, readEnvVar, readPortEnv } from '@chrischall/mcp-utils';
 import {
   DEFAULT_ALLTRAILS_API_KEY,
   DEFAULT_CALLER,
@@ -62,6 +62,14 @@ export function getRequestTimeoutMs(): number {
   if (typeof raw !== 'string' || raw.trim().length === 0) return DEFAULT_REQUEST_TIMEOUT_MS;
   const n = Number(raw.trim());
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
+// The fetchproxy concentrator port. The whole fleet (and the Transporter
+// extension) shares 37149; override with ALLTRAILS_WS_PORT only for local
+// development or test isolation.
+const DEFAULT_WS_PORT = 37_149;
+export function getWsPort(): number {
+  return readPortEnv('ALLTRAILS_WS_PORT', DEFAULT_WS_PORT);
 }
 
 // Set ALLTRAILS_DEBUG_LOG=1 (or true/yes/on) to log every request/response to
