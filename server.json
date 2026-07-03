@@ -6,12 +6,12 @@
     "url": "https://github.com/chrischall/alltrails-mcp",
     "source": "github"
   },
-  "version": "0.3.0",
+  "version": "1.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "alltrails-mcp",
-      "version": "0.3.0",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
       },
