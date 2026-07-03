@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/chrischall/alltrails-mcp/compare/v0.3.0...v1.0.0) (2026-07-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* ALLTRAILS_COOKIE is no longer honored; the fetchproxy Transporter extension and a signed-in alltrails.com tab are required.
+
+### Features
+
+* require fetchproxy — route every API request through the bridge ([#15](https://github.com/chrischall/alltrails-mcp/issues/15)) ([a72a2d1](https://github.com/chrischall/alltrails-mcp/commit/a72a2d1ee1897b7b02290037619aa720e389e159))
+
 ## [0.3.0](https://github.com/chrischall/alltrails-mcp/compare/v0.2.0...v0.3.0) (2026-07-02)
 
 
