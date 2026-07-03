@@ -44,7 +44,6 @@ ALLTRAILS_COOKIE              Optional. Cookie header from a signed-in alltrails
 ALLTRAILS_DISABLE_FETCHPROXY  Optional. "1|true|yes|on" → disable the bridge (missing cookie becomes a hard AllTrailsConfigError)
 ALLTRAILS_WS_PORT             Optional. fetchproxy concentrator port (default 37149 — the WHOLE fleet + the Transporter extension share it; override only for local dev/test isolation)
 ALLTRAILS_USER_ID             Optional. Numeric user id for the per-user tools; skips the /api/alltrails/me lookup (or targets another public profile)
-ALLTRAILS_API_KEY             Optional. Overrides the embedded x-at-key app key if AllTrails rotates it
 ALLTRAILS_CALLER              Optional. Overrides the x-at-caller header (default "Mugen")
 ALLTRAILS_LOCALE              Optional. Overrides the x-language-locale header (default "en-US")
 ALLTRAILS_USER_AGENT          Optional. Overrides the browser-like User-Agent (cookie escape hatch only — the browser owns the UA in bridge mode)
@@ -79,7 +78,7 @@ Every JSON response is validated with zod at the call site via `parseAllTrails(s
 ## AllTrails API notes (reverse-engineered — all unofficial)
 
 - Base URL `https://www.alltrails.com`; internal paths under `/api/alltrails/...`.
-- **`x-at-key`** is a static, anonymous *app key* (not a user secret) the web/mobile client embeds. The embedded default lives in `protocol.ts`; AllTrails rotates it, so `ALLTRAILS_API_KEY` overrides it. An in-tab fetch does NOT send it automatically — the client attaches it on every bridge request (without it the API returns 400).
+- **`x-at-key`** is a static, anonymous *app key* (not a user secret) the web/mobile client embeds. **No value is stored in this repo or its config**: the client captures the live one from the tab's own API traffic (`captureRequestHeader`) on first need, holds it in process memory only, and re-captures reactively on the 400/401 rotation signature (discarding values equal to the stale key so it can't recapture its own requests). An in-tab fetch does NOT send it automatically — the client attaches it on every request (without it the API returns 400).
 - **DataDome** fronts the API: the anti-bot `datadome` cookie (~10 min TTL) is required or it returns `403`, and DataDome also fingerprints the HTTP client — Node-originated requests can be 403'd even with a fresh cookie. This is why requests ride the user's own browser tab.
 - Verified endpoints anchored on: `GET /api/alltrails/v3/trails/{id}?detail=...`, `POST /api/alltrails/v2/trails/{id}/reviews/search`, `GET /api/alltrails/v2/trails/{id}/photos`, `GET /api/alltrails/weather-service/v2/trails/{id}/overview`, `GET /api/alltrails/locations/{states|countries}/{id}/trails`, `GET /api/alltrails/me`, `GET /api/alltrails/users/{id}/{lists|trails/completed}`, `GET /api/alltrails/community/blazes/v0/users/{id}/feeds`.
 - Response shapes below were captured live 2026-07-02 (via an in-browser fetchproxy bridge probe — Node replays of a captured cookie were 403'd by DataDome that day, but same-origin in-tab fetches sail through):

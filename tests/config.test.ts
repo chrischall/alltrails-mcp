@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
   parseBoolEnv,
-  getApiKey,
   getCaller,
   getLocale,
   getUserAgent,
@@ -10,14 +9,12 @@ import {
   debugLogEnabled,
 } from '../src/config.js';
 import {
-  DEFAULT_ALLTRAILS_API_KEY,
   DEFAULT_CALLER,
   DEFAULT_LOCALE,
   DEFAULT_USER_AGENT,
 } from '../src/protocol.js';
 
 const TOUCHED = [
-  'ALLTRAILS_API_KEY',
   'ALLTRAILS_CALLER',
   'ALLTRAILS_LOCALE',
   'ALLTRAILS_USER_AGENT',
@@ -44,20 +41,6 @@ describe('parseBoolEnv', () => {
 
   it('is false when unset', () => {
     expect(parseBoolEnv('ALLTRAILS_DISABLE_FETCHPROXY')).toBe(false);
-  });
-});
-
-describe('getApiKey', () => {
-  it('returns the embedded default when unset', () => {
-    expect(getApiKey()).toBe(DEFAULT_ALLTRAILS_API_KEY);
-  });
-  it('returns the override when ALLTRAILS_API_KEY is set', () => {
-    process.env.ALLTRAILS_API_KEY = 'rotated-key';
-    expect(getApiKey()).toBe('rotated-key');
-  });
-  it('treats a placeholder value as unset', () => {
-    process.env.ALLTRAILS_API_KEY = '${ALLTRAILS_API_KEY}';
-    expect(getApiKey()).toBe(DEFAULT_ALLTRAILS_API_KEY);
   });
 });
 

@@ -90,8 +90,15 @@ Bridge-path details:
 - Dependency `@fetchproxy/bootstrap` (replaced by direct dep `@fetchproxy/server`,
   which `@chrischall/mcp-utils/fetchproxy` peers on; already ≥ the 0.11 floor).
 
-Consequence: the live `x-at-key` capture is gone. If AllTrails rotates the app key,
-the fix is `ALLTRAILS_API_KEY` (documented).
+**Amendment (same day, user directive):** the app key is never stored in code or
+config. `DEFAULT_ALLTRAILS_API_KEY` and `ALLTRAILS_API_KEY` are removed; the client
+captures the live `x-at-key` from the tab's own API traffic (`captureRequestHeader`)
+on first need, holds it in process memory only, and re-captures reactively on the
+400/401 rotation signature — discarding captured values equal to the stale key so it
+cannot recapture its own in-flight requests. Consequences: `ALLTRAILS_DISABLE_FETCHPROXY`
+now disables the server entirely (even with `ALLTRAILS_COOKIE`, there is no key
+source), and the transport declares the `capture_request_header` capability (one-time
+pairing re-approval in the Transporter extension).
 
 ### New tool: `alltrails_healthcheck`
 
@@ -109,7 +116,8 @@ exercises the same headers/guards real tools use. Registered from a new
 | `ALLTRAILS_COOKIE` | Kept — now the *Node-direct escape hatch* (was priority path 1; still is, but documented as best-effort vs DataDome). |
 | `ALLTRAILS_DISABLE_FETCHPROXY` | Kept — disables the bridge; without a cookie this is a hard config error. |
 | `ALLTRAILS_USER_AGENT` | Kept — only affects the env-cookie Node path (the browser owns UA in bridge mode). |
-| Others (`ALLTRAILS_API_KEY`, `ALLTRAILS_CALLER`, `ALLTRAILS_LOCALE`, `ALLTRAILS_REQUEST_TIMEOUT_MS`, `ALLTRAILS_DEBUG_LOG`, `ALLTRAILS_USER_ID`) | Unchanged in meaning; timeout also forwards to the bridge's `fetchTimeoutMs`. |
+| `ALLTRAILS_API_KEY` | **Removed** (amendment above) — the key is captured live, never configured. |
+| Others (`ALLTRAILS_CALLER`, `ALLTRAILS_LOCALE`, `ALLTRAILS_REQUEST_TIMEOUT_MS`, `ALLTRAILS_DEBUG_LOG`, `ALLTRAILS_USER_ID`) | Unchanged in meaning; timeout also forwards to the bridge's `fetchTimeoutMs`. |
 
 ### Onboarding (docs)
 

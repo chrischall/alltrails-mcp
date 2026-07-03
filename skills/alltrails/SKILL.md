@@ -27,7 +27,7 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
 }
 ```
 
-Every API request routes through the **fetchproxy** browser bridge: it runs as a same-origin fetch inside your signed-in alltrails.com tab (DataDome fingerprints Node-originated requests, so a copied cookie alone is not reliable). Requirements: the fetchproxy Transporter extension installed, a signed-in alltrails.com tab open, and a one-time pair-code approval on first use. `ALLTRAILS_COOKIE` (a Cookie header copied from DevTools, including the short-lived `datadome` cookie) remains as a best-effort Node-direct escape hatch for hosts without the extension.
+Every API request routes through the **fetchproxy** browser bridge: it runs as a same-origin fetch inside your signed-in alltrails.com tab (DataDome fingerprints Node-originated requests, so a copied cookie alone is not reliable). Requirements: the fetchproxy Transporter extension installed, a signed-in alltrails.com tab open, and a one-time pair-code approval on first use. The `x-at-key` app key is never stored in code or config — it is captured live from the tab's own API traffic and held in memory only. `ALLTRAILS_COOKIE` (a Cookie header copied from DevTools) switches the API calls themselves to best-effort Node-direct requests, but the extension is still required for the key capture.
 
 ## Tools
 

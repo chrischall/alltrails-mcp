@@ -16,17 +16,23 @@
 //      alltrails.com tab via the fetchproxy bridge (src/transport.ts). The
 //      browser carries its own cookies; we attach only the AllTrails protocol
 //      headers (x-at-key & co.), which an in-tab fetch does not add on its
-//      own. Opt out with ALLTRAILS_DISABLE_FETCHPROXY=1 — without a cookie
-//      that is a permanent config error.
+//      own.
+//
+// THE x-at-key APP KEY is never stored in code or config: it is captured live
+// from the tab's own API traffic (captureRequestHeader) on first need, held in
+// process memory only, and reused for the life of the process. On a 400/401
+// (the rotation signature) the client re-captures — discarding values equal to
+// the stale key so it can't recapture its own in-flight requests — and replays
+// once. ALLTRAILS_DISABLE_FETCHPROXY therefore disables the server entirely
+// (even with a cookie, there is no way to obtain the key).
 
-import { loadDotenvSafely, readEnvVar } from '@chrischall/mcp-utils';
+import { loadDotenvSafely, messageOf, readEnvVar } from '@chrischall/mcp-utils';
 import { bridgeErrorInfo, type FetchproxyTransport } from '@chrischall/mcp-utils/fetchproxy';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { createAllTrailsTransport } from './transport.js';
 import {
   debugLogEnabled,
-  getApiKey,
   getCaller,
   getLocale,
   getRequestTimeoutMs,
@@ -70,10 +76,10 @@ function redactCookie(h: Record<string, string>): Record<string, string> {
 }
 
 /** The AllTrails protocol headers an in-tab fetch does NOT add on its own. */
-function protocolHeaders(hasBody: boolean): Record<string, string> {
+function protocolHeaders(apiKey: string, hasBody: boolean): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    'x-at-key': getApiKey(),
+    'x-at-key': apiKey,
     'x-at-caller': getCaller(),
     'x-language-locale': getLocale(),
   };
@@ -81,11 +87,73 @@ function protocolHeaders(hasBody: boolean): Record<string, string> {
   return headers;
 }
 
+/** Where the app key is captured from: the tab's own API requests. */
+const KEY_CAPTURE = { host: 'www.alltrails.com', path: '/api/alltrails/*', headerName: 'x-at-key' } as const;
+
 export class AllTrailsClient {
   private transport: FetchproxyTransport | undefined;
   private startPromise: Promise<void> | undefined;
+  private apiKey: string | undefined;
+  private apiKeyPromise: Promise<string> | undefined;
 
   constructor(private readonly injected: { transport?: FetchproxyTransport } = {}) {}
+
+  /**
+   * The live-captured x-at-key, or undefined before the first capture. Memory
+   * only — never persisted. Exposed so the photo projection can sign derived
+   * image URLs with the same key the requests used.
+   */
+  currentApiKey(): string | undefined {
+    return this.apiKey;
+  }
+
+  /**
+   * Ensure a usable app key is in memory, capturing it from the tab's own API
+   * traffic when absent (or when the cached key is `invalidKey` — the
+   * rotation re-capture). Single-flight: concurrent callers share one capture.
+   */
+  private async ensureApiKey(invalidKey?: string): Promise<string> {
+    if (this.apiKey !== undefined && this.apiKey !== invalidKey) return this.apiKey;
+    if (!this.apiKeyPromise) {
+      this.apiKeyPromise = this.captureApiKey(invalidKey).finally(() => {
+        this.apiKeyPromise = undefined;
+      });
+    }
+    return this.apiKeyPromise;
+  }
+
+  // One-shot header captures until a value differing from `invalidKey` shows
+  // up. The stale-key filter matters: our own bridge requests hit the same
+  // host/path pattern, so a rotation re-capture could otherwise snapshot one
+  // of our own in-flight requests and hand back the key we're replacing.
+  private async captureApiKey(invalidKey?: string): Promise<string> {
+    const transport = await this.bridgeReady();
+    console.error(
+      '[alltrails-mcp] Capturing the x-at-key app key from the browser — open or refresh a signed-in ' +
+        'www.alltrails.com page if this stalls.',
+    );
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let captured: string;
+      try {
+        captured = await transport.server.captureRequestHeader({ ...KEY_CAPTURE });
+      } catch (e) {
+        // The capture only fires when the tab itself makes an API request —
+        // an idle tab times out. Say what to do, not just what failed.
+        throw new Error(
+          `AllTrails: capturing the x-at-key app key failed (${messageOf(e)}). The capture only sees ` +
+            'requests the tab itself makes — open or refresh a signed-in www.alltrails.com page and retry.',
+        );
+      }
+      if (captured !== invalidKey) {
+        this.apiKey = captured;
+        return captured;
+      }
+    }
+    throw new Error(
+      'AllTrails: could not capture a fresh x-at-key from the browser (kept seeing the stale value). ' +
+        'Refresh a signed-in alltrails.com tab and retry.',
+    );
+  }
 
   /**
    * The bridge transport, created lazily (construction is cheap — the port
@@ -137,7 +205,8 @@ export class AllTrailsClient {
     }
   }
 
-  // The 429 wait-and-replay-once and the non-2xx → throw, shared by both paths.
+  // The 429 wait-and-replay-once, the rotation re-capture, and the
+  // non-2xx → throw, shared by both paths.
   private async performWithRetry(method: string, path: string, body: unknown): Promise<UpstreamResponse> {
     let res = await this.perform(method, path, body, false);
     if (res.status === 429) {
@@ -153,6 +222,22 @@ export class AllTrailsClient {
       res = await this.perform(method, path, body, true);
       if (res.status === 429) throw new Error('Rate limited by AllTrails API');
     }
+    if (res.status === 400 || res.status === 401) {
+      // The rotation signature: AllTrails answers 400/401 when x-at-key is
+      // missing or stale. Try to capture a DIFFERENT key from the tab; if the
+      // app is still using ours, the capture keeps seeing the stale value and
+      // throws — the failure was the request itself, so keep the original
+      // error. Only a genuinely fresh key earns the one replay.
+      const staleKey = this.apiKey;
+      try {
+        await this.ensureApiKey(staleKey);
+      } catch {
+        // No fresh key obtainable — fall through to the original response.
+      }
+      if (this.apiKey !== staleKey) {
+        res = await this.perform(method, path, body, true);
+      }
+    }
     if (res.status < 200 || res.status >= 300) {
       const hint =
         res.status === 401 || res.status === 403
@@ -165,18 +250,18 @@ export class AllTrailsClient {
     return res;
   }
 
-  // Route one request: env cookie → Node; bridge disabled → config error;
-  // otherwise → bridge.
+  // Route one request: bridge disabled → config error (even with a cookie,
+  // the x-at-key capture needs the bridge); env cookie → Node; else → bridge.
   private async perform(method: string, path: string, body: unknown, isRetry: boolean): Promise<UpstreamResponse> {
-    const envCookie = readEnvVar('ALLTRAILS_COOKIE');
-    if (envCookie) return this.fetchNode(method, path, body, envCookie, isRetry);
     if (parseBoolEnv('ALLTRAILS_DISABLE_FETCHPROXY')) {
       throw new AllTrailsConfigError(
-        'AllTrails auth: set ALLTRAILS_COOKIE to a Cookie header from a signed-in alltrails.com ' +
-          'session, or install the fetchproxy Transporter extension and sign into alltrails.com ' +
-          '(unset ALLTRAILS_DISABLE_FETCHPROXY if it is set).',
+        'AllTrails: the x-at-key app key is captured live from a signed-in alltrails.com tab via the ' +
+          'fetchproxy Transporter extension, and ALLTRAILS_DISABLE_FETCHPROXY leaves no way to obtain it ' +
+          '(no key is stored in code or config). Unset ALLTRAILS_DISABLE_FETCHPROXY and install the extension.',
       );
     }
+    const envCookie = readEnvVar('ALLTRAILS_COOKIE');
+    if (envCookie) return this.fetchNode(method, path, body, envCookie, isRetry);
     return this.fetchBridge(method, path, body, isRetry);
   }
 
@@ -190,7 +275,7 @@ export class AllTrailsClient {
     body: unknown,
     isRetry: boolean,
   ): Promise<UpstreamResponse> {
-    const headers = protocolHeaders(body !== undefined);
+    const headers = protocolHeaders(await this.ensureApiKey(), body !== undefined);
     if (debugLogEnabled()) {
       const bodyPreview = body === undefined ? '<none>' : JSON.stringify(body);
       console.error(`[alltrails-debug] → ${method} ${path} via bridge${isRetry ? ' (retry)' : ''}`);
@@ -233,7 +318,7 @@ export class AllTrailsClient {
     isRetry: boolean,
   ): Promise<UpstreamResponse> {
     const headers: Record<string, string> = {
-      ...protocolHeaders(body !== undefined),
+      ...protocolHeaders(await this.ensureApiKey(), body !== undefined),
       'User-Agent': getUserAgent(),
       Origin: BASE_URL,
       Referer: `${BASE_URL}/`,

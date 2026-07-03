@@ -1,10 +1,5 @@
 import { parseBoolEnv as parseBoolEnvUtil, readEnvVar, readPortEnv } from '@chrischall/mcp-utils';
-import {
-  DEFAULT_ALLTRAILS_API_KEY,
-  DEFAULT_CALLER,
-  DEFAULT_LOCALE,
-  DEFAULT_USER_AGENT,
-} from './protocol.js';
+import { DEFAULT_CALLER, DEFAULT_LOCALE, DEFAULT_USER_AGENT } from './protocol.js';
 
 /**
  * True when a boolean-shaped env var is set to "1", "true", "yes", or "on"
@@ -15,16 +10,6 @@ import {
  */
 export function parseBoolEnv(name: string): boolean {
   return parseBoolEnvUtil(name);
-}
-
-/**
- * The `x-at-key` app key sent on every request. Defaults to the embedded value
- * observed in the wild; override with ALLTRAILS_API_KEY when AllTrails rotates
- * it. A live value captured from the browser (auth.ts) takes precedence over
- * both — this getter is only the fallback.
- */
-export function getApiKey(): string {
-  return readEnvVar('ALLTRAILS_API_KEY') ?? DEFAULT_ALLTRAILS_API_KEY;
 }
 
 /** The `x-at-caller` header. Override with ALLTRAILS_CALLER. */

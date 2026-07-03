@@ -1,7 +1,7 @@
 import { rawTextResult, textResult } from '@chrischall/mcp-utils';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
-import { getApiKey, getConfiguredUserId } from '../config.js';
+import { getConfiguredUserId } from '../config.js';
 import { BASE_URL } from '../protocol.js';
 import { parseAllTrails } from '../validate.js';
 
@@ -274,10 +274,11 @@ export interface PhotoSummary {
  * Project a raw photo into a {@link PhotoSummary}. The photo records carry no
  * direct image URL; `GET /api/alltrails/photos/{id}/image?size=large&key=…`
  * (verified 2026-07-02) 302s to the CDN image and is not bot-walled, so the
- * summary derives that URL. `key` is the anonymous embedded app key (or the
- * ALLTRAILS_API_KEY override), not a user secret.
+ * summary derives that URL. `apiKey` is the live-captured anonymous app key
+ * (`client.currentApiKey()`), not a user secret — when absent the `key` param
+ * is omitted.
  */
-export function summarizePhoto(raw: RawPhoto): PhotoSummary {
+export function summarizePhoto(raw: RawPhoto, apiKey?: string): PhotoSummary {
   const user = [nonEmpty(raw.user?.firstName), nonEmpty(raw.user?.lastName)].filter(Boolean).join(' ');
   return {
     id: raw.id === undefined ? undefined : `${raw.id}`,
@@ -291,7 +292,9 @@ export function summarizePhoto(raw: RawPhoto): PhotoSummary {
     url:
       raw.id === undefined
         ? undefined
-        : `${BASE_URL}/api/alltrails/photos/${encodeURIComponent(raw.id)}/image?size=large&key=${encodeURIComponent(getApiKey())}`,
+        : `${BASE_URL}/api/alltrails/photos/${encodeURIComponent(raw.id)}/image?size=large${
+            apiKey === undefined ? '' : `&key=${encodeURIComponent(apiKey)}`
+          }`,
   };
 }
 

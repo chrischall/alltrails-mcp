@@ -50,6 +50,12 @@ export function createAllTrailsTransport(
     // domain as "exact host or any subdomain of it").
     domains: ['alltrails.com'],
     defaultSubdomain: 'www',
+    // The x-at-key app key is never stored in code or config — the client
+    // captures the live value from the tab's own API traffic on first need
+    // (client.ts). That capture needs the capture_request_header capability
+    // declared here, alongside the default fetch verb.
+    capabilities: ['fetch', 'capture_request_header'],
+    captureHeaders: [{ host: 'www.alltrails.com', path: '/api/alltrails/*', headerName: 'x-at-key' }],
     // Canonical fleet startup banner on start() — stderr only (stdout is the
     // JSON-RPC channel).
     logListening: true,

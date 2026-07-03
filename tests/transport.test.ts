@@ -48,6 +48,15 @@ describe('createAllTrailsTransport', () => {
     expect(captured.opts?.version).toBe(pkg.version);
   });
 
+  it('declares the x-at-key capture alongside the fetch capability', () => {
+    const { captured, createServer } = capturingSeam();
+    createAllTrailsTransport(createServer);
+    expect(captured.opts?.capabilities).toEqual(expect.arrayContaining(['fetch', 'capture_request_header']));
+    expect(captured.opts?.captureHeaders).toEqual([
+      { host: 'www.alltrails.com', path: '/api/alltrails/*', headerName: 'x-at-key' },
+    ]);
+  });
+
   it('forwards the request timeout as the bridge fetchTimeoutMs', () => {
     process.env.ALLTRAILS_REQUEST_TIMEOUT_MS = '12345';
     const { captured, createServer } = capturingSeam();

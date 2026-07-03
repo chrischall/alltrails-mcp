@@ -87,7 +87,9 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
     if (args.compact) {
       const parsed = parseAllTrails(PhotoListSchema, raw, 'GET /api/alltrails/v2/trails/{id}/photos');
       if (Array.isArray(parsed.photos)) {
-        const photos = parsed.photos.map(summarizePhoto);
+        // Sign the derived image URLs with the same live-captured key the
+        // request itself used (set by now — the fetch above needed it).
+        const photos = parsed.photos.map((p) => summarizePhoto(p, client.currentApiKey()));
         return jsonResponse({ count: photos.length, photos });
       }
     }

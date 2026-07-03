@@ -3,24 +3,33 @@ import { FetchproxyBridgeDownError, type FetchproxyTransport } from '@chrischall
 import { AllTrailsClient, AllTrailsConfigError } from '../src/client.js';
 
 const COOKIE = 'datadome=ddvalue; _at_session=sess1';
+const CAPTURED_KEY = 'live-captured-key';
 
 // ── Bridge stubs ────────────────────────────────────────────────────────────
 // The client's hot path delegates to FetchproxyTransport.fetch; each entry
-// maps to one bridge round-trip in order.
+// maps to one bridge round-trip in order. The x-at-key app key is captured
+// live via server.captureRequestHeader — `captures` maps to one capture each.
 interface BridgeResponse {
   status: number;
   body?: string;
 }
 
-function stubTransport(responses: (BridgeResponse | Error)[]) {
+function stubTransport(responses: (BridgeResponse | Error)[], captures: (string | Error)[] = [CAPTURED_KEY]) {
   let idx = 0;
+  let capIdx = 0;
   const start = vi.fn(async () => {});
   const fetch = vi.fn(async () => {
     const r = responses[idx++] ?? { status: 200, body: '{}' };
     if (r instanceof Error) throw r;
     return { status: r.status, body: r.body ?? '{}', url: 'https://www.alltrails.com/x' };
   });
-  return { transport: { start, fetch } as unknown as FetchproxyTransport, fetch, start };
+  const captureRequestHeader = vi.fn(async () => {
+    const c = captures[Math.min(capIdx++, captures.length - 1)];
+    if (c instanceof Error) throw c;
+    return c;
+  });
+  const transport = { start, fetch, server: { captureRequestHeader } } as unknown as FetchproxyTransport;
+  return { transport, fetch, start, captureRequestHeader };
 }
 
 // ── Node-path fetch mock (env-cookie escape hatch) ──────────────────────────
@@ -54,6 +63,109 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('AllTrailsClient — x-at-key live capture', () => {
+  it('captures the key from the tab before the first request and sends it', async () => {
+    const { transport, fetch, captureRequestHeader } = stubTransport([{ status: 200, body: '{"ok":true}' }]);
+    const client = new AllTrailsClient({ transport });
+    await client.request('GET', '/api/alltrails/v3/trails/1');
+
+    expect(captureRequestHeader).toHaveBeenCalledWith({
+      host: 'www.alltrails.com',
+      path: '/api/alltrails/*',
+      headerName: 'x-at-key',
+    });
+    const init = fetch.mock.calls[0][0] as { headers: Record<string, string> };
+    expect(init.headers['x-at-key']).toBe(CAPTURED_KEY);
+    // Capture precedes the request.
+    expect(captureRequestHeader.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[0]);
+  });
+
+  it('captures once and reuses the in-memory key across requests', async () => {
+    const { transport, captureRequestHeader } = stubTransport([
+      { status: 200, body: '{}' },
+      { status: 200, body: '{}' },
+    ]);
+    const client = new AllTrailsClient({ transport });
+    await client.request('GET', '/api/alltrails/a');
+    await client.request('GET', '/api/alltrails/b');
+    expect(captureRequestHeader).toHaveBeenCalledTimes(1);
+    expect(client.currentApiKey()).toBe(CAPTURED_KEY);
+  });
+
+  it('single-flights concurrent first requests onto one capture', async () => {
+    const { transport, captureRequestHeader } = stubTransport([
+      { status: 200, body: '{}' },
+      { status: 200, body: '{}' },
+    ]);
+    const client = new AllTrailsClient({ transport });
+    await Promise.all([client.request('GET', '/api/alltrails/a'), client.request('GET', '/api/alltrails/b')]);
+    expect(captureRequestHeader).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-captures on 401 (rotation signature), discards the stale key, and replays once', async () => {
+    const { transport, fetch, captureRequestHeader } = stubTransport(
+      [{ status: 401 }, { status: 200, body: '{"ok":true}' }],
+      // First capture: the original key. Re-capture sees the stale key once
+      // (e.g. a concurrent in-flight request of ours), then the rotated one.
+      ['stale-key', 'stale-key', 'rotated-key'],
+    );
+    const client = new AllTrailsClient({ transport });
+    const result = await client.request<{ ok: boolean }>('GET', '/api/alltrails/x');
+    expect(result).toEqual({ ok: true });
+    expect(captureRequestHeader).toHaveBeenCalledTimes(3);
+    const retryInit = fetch.mock.calls[1][0] as { headers: Record<string, string> };
+    expect(retryInit.headers['x-at-key']).toBe('rotated-key');
+  });
+
+  it('surfaces the original 400 when re-capture keeps seeing the same key (genuinely bad request)', async () => {
+    const { transport, fetch } = stubTransport(
+      [{ status: 400 }],
+      // Every capture returns the same key — the app still uses it, so the
+      // 400 was our fault, not a rotation.
+      [CAPTURED_KEY],
+    );
+    const client = new AllTrailsClient({ transport });
+    await expect(client.request('POST', '/api/alltrails/x', { bad: true })).rejects.toThrow(
+      /AllTrails API error: 400/,
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the original error when the rotation re-capture itself fails', async () => {
+    const { transport } = stubTransport(
+      [{ status: 401 }],
+      ['first-key', new Error('capture timed out')],
+    );
+    const client = new AllTrailsClient({ transport });
+    await expect(client.request('GET', '/api/alltrails/x')).rejects.toThrow(/AllTrails API error: 401/);
+  });
+
+  it('throws a config error when the bridge is disabled (no key source), even with a cookie', async () => {
+    process.env.ALLTRAILS_COOKIE = COOKIE;
+    process.env.ALLTRAILS_DISABLE_FETCHPROXY = '1';
+    const client = new AllTrailsClient();
+    const err = await client.request('GET', '/api/alltrails/x').catch((e) => e as Error);
+    expect(err).toBeInstanceOf(AllTrailsConfigError);
+    expect(err.message).toContain('x-at-key');
+  });
+
+  it('wraps a capture failure with an actionable open-a-tab hint', async () => {
+    const { transport } = stubTransport(
+      [],
+      [new Error('fetchproxy: https://www.alltrails.com/api/alltrails/* did not respond within 30000ms')],
+    );
+    const client = new AllTrailsClient({ transport });
+    const err = await client.request('GET', '/api/alltrails/x').catch((e) => e as Error);
+    expect(err.message).toContain('did not respond within 30000ms');
+    expect(err.message).toContain('open or refresh a signed-in www.alltrails.com page');
+  });
+
+  it('currentApiKey() is undefined before the first capture', () => {
+    const { transport } = stubTransport([]);
+    expect(new AllTrailsClient({ transport }).currentApiKey()).toBeUndefined();
+  });
+});
+
 describe('AllTrailsClient — bridge path (default)', () => {
   it('routes requests through the bridge with the protocol headers and no Cookie', async () => {
     const { transport, fetch } = stubTransport([{ status: 200, body: '{"ok":true}' }]);
@@ -69,7 +181,7 @@ describe('AllTrailsClient — bridge path (default)', () => {
     };
     expect(init.method).toBe('GET');
     expect(init.path).toBe('/api/alltrails/v3/trails/1');
-    expect(init.headers['x-at-key']).toBe('3p0t5s6b5g4g0e8k3c1j3w7y5c3m4t8i');
+    expect(init.headers['x-at-key']).toBe(CAPTURED_KEY);
     expect(init.headers['x-at-caller']).toBe('Mugen');
     expect(init.headers['x-language-locale']).toBe('en-US');
     expect(init.headers['Accept']).toBe('application/json');
@@ -87,18 +199,6 @@ describe('AllTrailsClient — bridge path (default)', () => {
     const init = fetch.mock.calls[0][0] as { headers: Record<string, string>; body?: string };
     expect(init.body).toBe(JSON.stringify({ limit: 5 }));
     expect(init.headers['Content-Type']).toBe('application/json');
-  });
-
-  it('honors the ALLTRAILS_API_KEY override in the bridge headers', async () => {
-    process.env.ALLTRAILS_API_KEY = 'rotated-key';
-    try {
-      const { transport, fetch } = stubTransport([{ status: 200 }]);
-      await new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x');
-      const init = fetch.mock.calls[0][0] as { headers: Record<string, string> };
-      expect(init.headers['x-at-key']).toBe('rotated-key');
-    } finally {
-      delete process.env.ALLTRAILS_API_KEY;
-    }
   });
 
   it('parses an empty response body as null', async () => {
@@ -119,20 +219,13 @@ describe('AllTrailsClient — bridge path (default)', () => {
     expect(err.message).toContain('<html><body>Please verify');
   });
 
-  it('throws with a signed-in-tab hint on 403', async () => {
+  it('throws with a signed-in-tab hint on a persistent 403', async () => {
     const { transport } = stubTransport([{ status: 403 }]);
     const err = await new AllTrailsClient({ transport })
       .request('GET', '/api/alltrails/x')
       .catch((e) => e as Error);
     expect(err.message).toContain('AllTrails API error: 403');
     expect(err.message).toContain('signed into alltrails.com');
-  });
-
-  it('throws the same hint on 401', async () => {
-    const { transport } = stubTransport([{ status: 401 }]);
-    await expect(new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x')).rejects.toThrow(
-      /signed into alltrails\.com/,
-    );
   });
 
   it('throws a generic error (no sign-in hint) on a 500', async () => {
@@ -211,7 +304,8 @@ describe('AllTrailsClient — bridge path (default)', () => {
       .mockRejectedValueOnce(new Error('identity dir unwritable'))
       .mockResolvedValue(undefined);
     const fetch = vi.fn(async () => ({ status: 200, body: '{"ok":1}', url: 'u' }));
-    const transport = { start, fetch } as unknown as FetchproxyTransport;
+    const captureRequestHeader = vi.fn(async () => CAPTURED_KEY);
+    const transport = { start, fetch, server: { captureRequestHeader } } as unknown as FetchproxyTransport;
     const client = new AllTrailsClient({ transport });
     await expect(client.request('GET', '/api/alltrails/x')).rejects.toThrow(/identity dir unwritable/);
     expect(await client.request('GET', '/api/alltrails/x')).toEqual({ ok: 1 });
@@ -231,18 +325,19 @@ describe('AllTrailsClient — ALLTRAILS_COOKIE escape hatch (Node-direct)', () =
     process.env.ALLTRAILS_COOKIE = COOKIE;
   });
 
-  it('sends Cookie + browser-shaped headers via Node fetch and never touches the bridge', async () => {
-    const { transport, fetch: bridgeFetch } = stubTransport([]);
+  it('sends Cookie + browser-shaped headers via Node fetch; only the key capture touches the bridge', async () => {
+    const { transport, fetch: bridgeFetch, captureRequestHeader } = stubTransport([]);
     const spy = mockFetch([{ status: 200, body: { ok: true } }]);
     const client = new AllTrailsClient({ transport });
     const result = await client.request<{ ok: boolean }>('GET', '/api/alltrails/v3/trails/1');
 
     expect(result).toEqual({ ok: true });
     expect(bridgeFetch).not.toHaveBeenCalled();
+    expect(captureRequestHeader).toHaveBeenCalledTimes(1);
     const init = spy.mock.calls[0][1] as RequestInit;
     const h = init.headers as Record<string, string>;
     expect(h['Cookie']).toBe(COOKIE);
-    expect(h['x-at-key']).toBe('3p0t5s6b5g4g0e8k3c1j3w7y5c3m4t8i');
+    expect(h['x-at-key']).toBe(CAPTURED_KEY);
     expect(h['x-at-caller']).toBe('Mugen');
     expect(h['x-language-locale']).toBe('en-US');
     expect(h['User-Agent']).toContain('Mozilla/5.0');
@@ -255,29 +350,36 @@ describe('AllTrailsClient — ALLTRAILS_COOKIE escape hatch (Node-direct)', () =
   });
 
   it('sends a JSON body + Content-Type on POST', async () => {
+    const { transport } = stubTransport([]);
     const spy = mockFetch([{ status: 200, body: {} }]);
-    await new AllTrailsClient().request('POST', '/api/alltrails/v2/trails/1/reviews/search', { limit: 5 });
+    await new AllTrailsClient({ transport }).request('POST', '/api/alltrails/v2/trails/1/reviews/search', {
+      limit: 5,
+    });
     const init = spy.mock.calls[0][1] as RequestInit;
     expect(init.body).toBe(JSON.stringify({ limit: 5 }));
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
   });
 
-  it('throws with a stale-cookie hint on 403 (no re-capture exists for an env cookie)', async () => {
+  it('throws with a stale-cookie hint on a persistent 403', async () => {
+    const { transport } = stubTransport([]);
     const spy = mockFetch([{ status: 403, body: {} }]);
-    const err = await new AllTrailsClient().request('GET', '/api/alltrails/x').catch((e) => e as Error);
+    const err = await new AllTrailsClient({ transport })
+      .request('GET', '/api/alltrails/x')
+      .catch((e) => e as Error);
     expect(err.message).toContain('AllTrails API error: 403');
     expect(err.message).toContain('ALLTRAILS_COOKIE');
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it('honors a delta-seconds Retry-After on 429', async () => {
+    const { transport } = stubTransport([]);
     vi.useFakeTimers();
     try {
       const spy = mockFetch([
         { status: 429, body: {}, headers: { 'retry-after': '5' } },
         { status: 200, body: { ok: true } },
       ]);
-      const promise = new AllTrailsClient().request('GET', '/api/alltrails/x');
+      const promise = new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x');
       // The fleet-standard 2s must NOT be enough — the server asked for 5s.
       await vi.advanceTimersByTimeAsync(4999);
       expect(spy).toHaveBeenCalledTimes(1);
@@ -290,13 +392,14 @@ describe('AllTrailsClient — ALLTRAILS_COOKIE escape hatch (Node-direct)', () =
   });
 
   it('caps a hostile/buggy Retry-After at 30s', async () => {
+    const { transport } = stubTransport([]);
     vi.useFakeTimers();
     try {
       const spy = mockFetch([
         { status: 429, body: {}, headers: { 'retry-after': '3600' } },
         { status: 200, body: { ok: 1 } },
       ]);
-      const promise = new AllTrailsClient().request('GET', '/api/alltrails/x');
+      const promise = new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x');
       await vi.advanceTimersByTimeAsync(30_000);
       expect(await promise).toEqual({ ok: 1 });
       expect(spy).toHaveBeenCalledTimes(2);
@@ -306,13 +409,14 @@ describe('AllTrailsClient — ALLTRAILS_COOKIE escape hatch (Node-direct)', () =
   });
 
   it('falls back to the 2s default for a non-numeric (HTTP-date) Retry-After', async () => {
+    const { transport } = stubTransport([]);
     vi.useFakeTimers();
     try {
       const spy = mockFetch([
         { status: 429, body: {}, headers: { 'retry-after': 'Wed, 01 Jul 2026 16:00:00 GMT' } },
         { status: 200, body: { ok: 2 } },
       ]);
-      const promise = new AllTrailsClient().request('GET', '/api/alltrails/x');
+      const promise = new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x');
       await vi.advanceTimersByTimeAsync(2000);
       expect(await promise).toEqual({ ok: 2 });
       expect(spy).toHaveBeenCalledTimes(2);
@@ -336,10 +440,11 @@ describe('AllTrailsClient — ALLTRAILS_COOKIE escape hatch (Node-direct)', () =
     }
 
     it('aborts a hung request after the default 30s timeout', async () => {
+      const { transport } = stubTransport([]);
       vi.useFakeTimers();
       try {
         mockHang();
-        const promise = new AllTrailsClient().request('GET', '/api/alltrails/v3/trails/9');
+        const promise = new AllTrailsClient({ transport }).request('GET', '/api/alltrails/v3/trails/9');
         promise.catch(() => undefined);
         await vi.advanceTimersByTimeAsync(30_000);
         await expect(promise).rejects.toThrow(
@@ -351,11 +456,12 @@ describe('AllTrailsClient — ALLTRAILS_COOKIE escape hatch (Node-direct)', () =
     });
 
     it('respects ALLTRAILS_REQUEST_TIMEOUT_MS', async () => {
+      const { transport } = stubTransport([]);
       process.env.ALLTRAILS_REQUEST_TIMEOUT_MS = '5000';
       vi.useFakeTimers();
       try {
         mockHang();
-        const promise = new AllTrailsClient().request('GET', '/api/alltrails/x');
+        const promise = new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x');
         promise.catch(() => undefined);
         await vi.advanceTimersByTimeAsync(5000);
         await expect(promise).rejects.toThrow(/timed out after 5000ms/);
@@ -365,10 +471,14 @@ describe('AllTrailsClient — ALLTRAILS_COOKIE escape hatch (Node-direct)', () =
     });
 
     it('does not fire the timeout when the request completes promptly', async () => {
+      const { transport } = stubTransport([]);
       vi.useFakeTimers();
       try {
         mockFetch([{ status: 200, body: { ok: true } }]);
-        const result = await new AllTrailsClient().request<{ ok: boolean }>('GET', '/api/alltrails/x');
+        const result = await new AllTrailsClient({ transport }).request<{ ok: boolean }>(
+          'GET',
+          '/api/alltrails/x',
+        );
         await vi.advanceTimersByTimeAsync(60_000);
         expect(result).toEqual({ ok: true });
       } finally {
@@ -377,8 +487,9 @@ describe('AllTrailsClient — ALLTRAILS_COOKIE escape hatch (Node-direct)', () =
     });
 
     it('propagates non-abort fetch errors unchanged', async () => {
+      const { transport } = stubTransport([]);
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('connect ECONNREFUSED'));
-      await expect(new AllTrailsClient().request('GET', '/api/alltrails/x')).rejects.toThrow(
+      await expect(new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x')).rejects.toThrow(
         'connect ECONNREFUSED',
       );
     });
@@ -391,7 +502,7 @@ describe('AllTrailsClient — nothing configured', () => {
     const client = new AllTrailsClient();
     const err = await client.request('GET', '/api/alltrails/x').catch((e) => e as Error);
     expect(err).toBeInstanceOf(AllTrailsConfigError);
-    expect(err.message).toMatch(/set ALLTRAILS_COOKIE/);
+    expect(err.message).toMatch(/ALLTRAILS_DISABLE_FETCHPROXY/);
     // And it stays a config error on subsequent calls.
     await expect(client.request('GET', '/api/alltrails/x')).rejects.toThrow(/ALLTRAILS_DISABLE_FETCHPROXY/);
   });
@@ -441,12 +552,32 @@ describe('ALLTRAILS_DEBUG_LOG', () => {
     expect(errSpy.mock.calls.some((c) => String(c[0]) === '[alltrails-debug] response body: <empty>')).toBe(true);
   });
 
+  it('redacts the Cookie header on the Node path', async () => {
+    const { transport } = stubTransport([]);
+    process.env.ALLTRAILS_COOKIE = COOKIE;
+    mockFetch([{ status: 200, body: { ok: true } }]);
+    await new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x');
+    const lines = errSpy.mock.calls.map((c) => String(c[0]));
+    expect(lines.some((l) => l.includes('"Cookie":"datadome=ddv') && l.includes('chars)'))).toBe(true);
+    expect(lines.some((l) => l.includes(COOKIE))).toBe(false);
+  });
+
+  it('redacts a short Cookie value too', async () => {
+    const { transport } = stubTransport([]);
+    process.env.ALLTRAILS_COOKIE = 'x';
+    mockFetch([{ status: 200, body: {} }]);
+    await new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x');
+    const dbg = errSpy.mock.calls.map((c) => String(c[0])).filter((l) => l.includes('headers:'));
+    expect(dbg.some((l) => l.includes('"Cookie":"x…'))).toBe(true);
+  });
+
   it('logs the body preview and (retry) marker on a replayed Node-path POST', async () => {
+    const { transport } = stubTransport([]);
     process.env.ALLTRAILS_COOKIE = COOKIE;
     vi.useFakeTimers();
     try {
       mockFetch([{ status: 429, body: {} }, { status: 200, body: { ok: 1 } }]);
-      const promise = new AllTrailsClient().request('POST', '/api/alltrails/x', { limit: 7 });
+      const promise = new AllTrailsClient({ transport }).request('POST', '/api/alltrails/x', { limit: 7 });
       await vi.advanceTimersByTimeAsync(2000);
       await promise;
       const dbg = errSpy.mock.calls.map((c) => String(c[0]));
@@ -457,26 +588,8 @@ describe('ALLTRAILS_DEBUG_LOG', () => {
     }
   });
 
-  it('redacts the Cookie header on the Node path', async () => {
-    process.env.ALLTRAILS_COOKIE = COOKIE;
-    mockFetch([{ status: 200, body: { ok: true } }]);
-    await new AllTrailsClient().request('GET', '/api/alltrails/x');
-    const lines = errSpy.mock.calls.map((c) => String(c[0]));
-    expect(lines.some((l) => l.includes('"Cookie":"datadome=ddv') && l.includes('chars)'))).toBe(true);
-    expect(lines.some((l) => l.includes(COOKIE))).toBe(false);
-  });
-
-  it('does not redact when the Cookie header is empty (defensive branch)', async () => {
-    // readEnvVar treats '' as unset, so drive the redactor directly through a
-    // whitespace-padded cookie that trims to a short value.
-    process.env.ALLTRAILS_COOKIE = 'x';
-    mockFetch([{ status: 200, body: {} }]);
-    await new AllTrailsClient().request('GET', '/api/alltrails/x');
-    const dbg = errSpy.mock.calls.map((c) => String(c[0])).filter((l) => l.includes('headers:'));
-    expect(dbg.some((l) => l.includes('"Cookie":"x…'))).toBe(true);
-  });
-
   it('logs the timeout path', async () => {
+    const { transport } = stubTransport([]);
     process.env.ALLTRAILS_COOKIE = COOKIE;
     vi.useFakeTimers();
     try {
@@ -490,7 +603,7 @@ describe('ALLTRAILS_DEBUG_LOG', () => {
             });
           }),
       );
-      const promise = new AllTrailsClient().request('GET', '/api/alltrails/timeout-check');
+      const promise = new AllTrailsClient({ transport }).request('GET', '/api/alltrails/timeout-check');
       promise.catch(() => undefined);
       await vi.advanceTimersByTimeAsync(30_000);
       await expect(promise).rejects.toThrow(/timed out/);
@@ -504,9 +617,10 @@ describe('ALLTRAILS_DEBUG_LOG', () => {
   });
 
   it('logs non-abort fetch errors', async () => {
+    const { transport } = stubTransport([]);
     process.env.ALLTRAILS_COOKIE = COOKIE;
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('socket hang up'));
-    await expect(new AllTrailsClient().request('GET', '/api/alltrails/err-check')).rejects.toThrow(
+    await expect(new AllTrailsClient({ transport }).request('GET', '/api/alltrails/err-check')).rejects.toThrow(
       'socket hang up',
     );
     const lines = errSpy.mock.calls.map((c) => String(c[0]));

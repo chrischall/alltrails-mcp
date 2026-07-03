@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { AllTrailsClient } from '../../src/client.js';
-import { DEFAULT_ALLTRAILS_API_KEY } from '../../src/protocol.js';
 import {
   jsonResponse,
   textResponse,
@@ -181,7 +180,7 @@ describe('summarizePhoto', () => {
       location: { postalCode: null, city: null, latitude: 63.7424617, longitude: -148.9533833 },
       user: { id: 23711569, firstName: 'Connie', lastName: 'Blade' },
       metadata: { created: '2022-07-02T21:07:21Z', status: 'A' },
-    })).toEqual({
+    }, 'live-captured-key')).toEqual({
       id: '49001265',
       title: 'Summit view',
       likeCount: 3,
@@ -189,8 +188,13 @@ describe('summarizePhoto', () => {
       uploadedAt: '2022-07-02T21:07:21Z',
       latitude: 63.7424617,
       longitude: -148.9533833,
-      url: `https://www.alltrails.com/api/alltrails/photos/49001265/image?size=large&key=${DEFAULT_ALLTRAILS_API_KEY}`,
+      url: 'https://www.alltrails.com/api/alltrails/photos/49001265/image?size=large&key=live-captured-key',
     });
+  });
+
+  it('omits the key param when no captured key is available yet', () => {
+    const s = summarizePhoto({ id: 7 });
+    expect(s.url).toBe('https://www.alltrails.com/api/alltrails/photos/7/image?size=large');
   });
 
   it('drops empty title, null description, and omits the url when the id is missing', () => {

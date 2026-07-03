@@ -87,10 +87,10 @@ Ask Claude: *"Search AllTrails for trails near me."*
 
 AllTrails fronts its internal API with DataDome bot protection, and DataDome fingerprints the HTTP client itself — a cookie copied out of the browser and replayed from Node can be rejected even while the browser sails through. So this server routes every API request through the [fetchproxy](https://github.com/chrischall/fetchproxy) bridge: each request runs as a same-origin fetch inside your own signed-in alltrails.com tab, reusing your authenticated session. Two paths, in priority order:
 
-1. **`ALLTRAILS_COOKIE` env var (escape hatch).** Paste a Cookie header captured from your browser (DevTools → Network on alltrails.com → any `/api/alltrails/...` request → the `Cookie` request header). Requests go out from Node directly with that header — useful for CI or hosts without the extension, but best-effort: the `datadome` cookie is short-lived, and DataDome may reject Node-originated requests regardless.
-2. **fetchproxy bridge (primary).** With the fetchproxy Transporter extension installed and a signed-in alltrails.com tab open, requests run inside that tab. On first use the extension shows a pair code — approve it once and the trust persists. Set `ALLTRAILS_DISABLE_FETCHPROXY=1` to opt out (a missing cookie then becomes a hard error).
+1. **`ALLTRAILS_COOKIE` env var (escape hatch).** Paste a Cookie header captured from your browser (DevTools → Network on alltrails.com → any `/api/alltrails/...` request → the `Cookie` request header). API requests then go out from Node directly with that header — best-effort: the `datadome` cookie is short-lived, and DataDome may reject Node-originated requests regardless. The bridge is still needed once per session to capture the `x-at-key` app key (see below).
+2. **fetchproxy bridge (primary).** With the fetchproxy Transporter extension installed and a signed-in alltrails.com tab open, requests run inside that tab. On first use the extension shows a pair code — approve it once and the trust persists.
 
-If the bridge is disabled and no cookie is set, the server throws with both fixes spelled out. The `alltrails_healthcheck` tool round-trips a probe through the bridge and tells you which hop broke.
+The `x-at-key` app key AllTrails' own client sends is **never stored in this repo or your config** — the server captures the live value from your tab's own API traffic on first need, keeps it in memory only, and re-captures automatically if AllTrails rotates it. A consequence: `ALLTRAILS_DISABLE_FETCHPROXY=1` disables the server entirely (even with a cookie, there is no key source). The `alltrails_healthcheck` tool round-trips a probe through the bridge and tells you which hop broke.
 
 ### Configuration
 
@@ -98,9 +98,8 @@ If the bridge is disabled and no cookie is set, the server throws with both fixe
 |---------|----------|---------|
 | `ALLTRAILS_COOKIE` | No | Cookie header from a signed-in alltrails.com session (must include `datadome`) — switches to Node-direct requests, bypassing the bridge. |
 | `ALLTRAILS_USER_ID` | No | Numeric user id for the per-user tools; defaults to the signed-in user via `/api/alltrails/me`. |
-| `ALLTRAILS_DISABLE_FETCHPROXY` | No | `1`/`true`/`yes`/`on` disables the bridge (a missing cookie is then a hard error). |
+| `ALLTRAILS_DISABLE_FETCHPROXY` | No | `1`/`true`/`yes`/`on` disables the bridge — and with it the server (the live `x-at-key` capture needs the bridge). |
 | `ALLTRAILS_WS_PORT` | No | fetchproxy concentrator port (default `37149`, shared by the whole fetchproxy fleet — override only for local dev/tests). |
-| `ALLTRAILS_API_KEY` | No | Overrides the embedded `x-at-key` app key if AllTrails rotates it. |
 | `ALLTRAILS_LOCALE` / `ALLTRAILS_CALLER` / `ALLTRAILS_USER_AGENT` | No | Override the corresponding request headers (`ALLTRAILS_USER_AGENT` only affects the cookie escape hatch — the browser owns the UA in bridge mode). |
 | `ALLTRAILS_REQUEST_TIMEOUT_MS` | No | Per-request timeout in ms (default `30000`), applied on both paths. |
 | `ALLTRAILS_DEBUG_LOG` | No | `1`/`true`/`yes`/`on` logs every request/response to stderr (Cookie redacted). |
