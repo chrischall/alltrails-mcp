@@ -119,6 +119,8 @@ Do NOT manually bump versions or create tags. Conventional-commit PR titles tell
 
 **Default workflow: branch + PR. Direct pushes to `main` are blocked by branch protection.** PR titles use conventional-commit prefixes — release-please reads them to pick the next version and write the CHANGELOG entry. Open with `gh pr create`; the auto-review verdict adds `ready-to-merge` on `pass`/`warn`. The repo is squash-only.
 
+**Exception for first-party dependency bumps.** When bumping a package we own (`@chrischall/mcp-utils`, `@chrischall/realty-core`, `@fetchproxy/server` — anything published from a chrischall-owned repo), use a `feat:` or `fix:` prefix instead of `chore:`/`build(deps):` (and if you're labeling the PR, `enhancement`/`bug` instead of `dependencies`). Those bumps deliver real product fixes or features through us, so they should drive a release-please version bump and show up under Features/Bug Fixes in the release notes — not get hidden as an invisible `chore`/under "Dependencies" (which doesn't trigger a release).
+
 The CI/release workflows are thin stubs that call the shared `chrischall/workflows` reusable pipelines (`reusable-mcp-ci.yml`, `mcp-publish`), identical to the rest of the fleet.
 
 ## Plugin / Distribution
