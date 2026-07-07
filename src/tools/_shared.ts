@@ -1,4 +1,5 @@
-import { decodeHtmlEntities, pruneUndefined, rawTextResult, textResult } from '@chrischall/mcp-utils';
+import { pruneUndefined, rawTextResult, textResult } from '@chrischall/mcp-utils';
+import { decodeHtmlEntities } from '@chrischall/mcp-utils/scrape';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
 import { getConfiguredUserId } from '../config.js';
