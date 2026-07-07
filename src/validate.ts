@@ -1,7 +1,12 @@
-import type { z } from 'zod';
+import { parseLenient } from '@chrischall/mcp-utils';
+import type { ZodType } from 'zod';
 
 /**
  * Validate an AllTrails API response against a zod schema at the call site.
+ *
+ * A thin binding over mcp-utils' shared `parseLenient` (the fleet's
+ * degrade-never-break validator) that fixes the log label to this server's name
+ * so call sites pass only the schema, the raw value, and a context string.
  *
  * Every AllTrails endpoint is reverse-engineered and undocumented, so a backend
  * change on their side would otherwise flow `undefined` silently into tool
@@ -11,29 +16,18 @@ import type { z } from 'zod';
  * verbatim).
  *
  * Two modes, chosen per call site:
- *  - `'lenient'` (default) — read paths. On mismatch, log a structured warning
- *    to stderr naming the endpoint and fields, then return the RAW response
- *    unchanged so the existing `??` fallbacks keep the tool useful.
+ *  - `'lenient'` (default) — read paths. On mismatch, `parseLenient` logs a
+ *    structured warning to stderr naming the context and offending fields, then
+ *    returns the RAW response unchanged so the existing `??` fallbacks keep the
+ *    tool useful.
  *  - `'strict'` — the rare path where a mistyped field must halt rather than
- *    degrade. On mismatch, throw.
- *
- * The error/warning text is deliberately precise ("trails.0.id: expected
- * number…") — it's the failure signal a maintainer (human or Claude) fixes in
- * one session, vs. "some trails show the wrong data sometimes".
+ *    degrade. On mismatch, `parseLenient` throws an `McpToolError`.
  */
-export function parseAllTrails<S extends z.ZodType>(
-  schema: S,
+export function parseAllTrails<T>(
+  schema: ZodType<T>,
   raw: unknown,
   ctx: string,
   mode: 'strict' | 'lenient' = 'lenient',
-): z.output<S> {
-  const result = schema.safeParse(raw);
-  if (result.success) return result.data;
-  const issues = result.error.issues
-    .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
-    .join('; ');
-  const message = `AllTrails response for ${ctx} failed validation: ${issues}`;
-  if (mode === 'strict') throw new Error(message);
-  console.error(`[alltrails-mcp] WARNING: ${message} — continuing with the raw response; fields derived from it may be missing or wrong.`);
-  return raw as z.output<S>;
+): T {
+  return parseLenient(schema, raw, { label: 'alltrails-mcp', context: ctx, mode });
 }
