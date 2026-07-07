@@ -28,7 +28,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
       query: z.string().describe('Free-text search, e.g. "angels landing" or "waterfall trails"').optional(),
       types: z
         .array(z.enum(SUGGESTION_RECORD_TYPES))
-        .describe('Record types to return (default: all). e.g. ["trail"] for trails only')
+        .describe('Record types to return (default: all). e.g. ["trail"] for trails only. Only applied when query is provided; silently ignored on the no-query legacy browse fallback.')
         .optional(),
       lat: z.number().describe('Deprecated — the API ignores it (verified 2026-07-02)').optional(),
       lng: z.number().describe('Deprecated — the API ignores it (verified 2026-07-02)').optional(),

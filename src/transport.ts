@@ -61,8 +61,8 @@ export function createAllTrailsTransport(
     logListening: true,
     // Reuse the existing debug switch for the bridge's per-request logging.
     debugEnvVar: 'ALLTRAILS_DEBUG_LOG',
-    // One timeout knob for both paths: ALLTRAILS_REQUEST_TIMEOUT_MS drives the
-    // Node escape-hatch AbortController AND the bridge's per-request deadline.
+    // One timeout knob: ALLTRAILS_REQUEST_TIMEOUT_MS drives the bridge's
+    // per-request deadline.
     fetchTimeoutMs: getRequestTimeoutMs(),
     ...(createServer ? { createServer } : {}),
   });
