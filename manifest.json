@@ -3,7 +3,7 @@
   "manifest_version": "0.3",
   "name": "alltrails-mcp",
   "display_name": "AllTrails",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Unofficial AllTrails tools for Claude — search trails, get details, reviews, photos, and your saved lists",
   "author": {
     "name": "Chris Chall",
