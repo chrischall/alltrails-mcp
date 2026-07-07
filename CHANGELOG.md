@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0](https://github.com/chrischall/alltrails-mcp/compare/v1.0.0...v1.1.0) (2026-07-07)
+
+
+### Features
+
+* adopt @chrischall/mcp-utils 0.12.0 (scrape subpath) ([#21](https://github.com/chrischall/alltrails-mcp/issues/21)) ([8643fc3](https://github.com/chrischall/alltrails-mcp/commit/8643fc37b7ee40ea43fc103701a3e72875e7fa94))
+
+
+### Refactor
+
+* adopt pruneUndefined + parseLenient (+ scrape decodeHtmlEntities) ([#18](https://github.com/chrischall/alltrails-mcp/issues/18)) ([729dc0c](https://github.com/chrischall/alltrails-mcp/commit/729dc0c178090cf71138e03a83fad096becf9db8))
+
+
+### Documentation
+
+* document first-party dependency-bump label exception ([#22](https://github.com/chrischall/alltrails-mcp/issues/22)) ([60c1a0d](https://github.com/chrischall/alltrails-mcp/commit/60c1a0dc6d998365f7d66b9497c61163222d53ad))
+* fix stale transport/SKILL notes + document alltrails_search types-without-query ([#20](https://github.com/chrischall/alltrails-mcp/issues/20)) ([a51bd4f](https://github.com/chrischall/alltrails-mcp/commit/a51bd4f798713708ae373ee894c03a3395cc9f0e))
+
 ## [1.0.0](https://github.com/chrischall/alltrails-mcp/compare/v0.3.0...v1.0.0) (2026-07-03)
 
 
