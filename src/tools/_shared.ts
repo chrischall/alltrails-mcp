@@ -1,4 +1,4 @@
-import { rawTextResult, textResult } from '@chrischall/mcp-utils';
+import { decodeHtmlEntities, pruneUndefined, rawTextResult, textResult } from '@chrischall/mcp-utils';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
 import { getConfiguredUserId } from '../config.js';
@@ -201,32 +201,29 @@ export function summarizeReview(raw: z.infer<typeof RawReviewSchema>): ReviewSum
   return { user: raw.user?.name, rating: raw.rating, comment: raw.comment };
 }
 
-/** Drop an object entirely when every one of its values is undefined. */
-function prune<T extends Record<string, unknown>>(obj: T): T | undefined {
-  return Object.values(obj).some((v) => v !== undefined) ? obj : undefined;
+/**
+ * Drop undefined-valued keys via mcp-utils' `pruneUndefined`, then collapse the
+ * whole object to `undefined` when nothing survives — so an all-empty nested
+ * projection is omitted rather than serialized as a noisy `{}` (which
+ * `pruneUndefined` alone would emit).
+ */
+function prune<T extends Record<string, unknown>>(obj: T): Partial<T> | undefined {
+  const pruned = pruneUndefined(obj);
+  return Object.keys(pruned).length > 0 ? pruned : undefined;
 }
 
-// Named entities the feed can realistically emit. `&amp;` is decoded LAST so a
-// literal `&amp;lt;` correctly becomes `&lt;`, not `<`.
-const NAMED_ENTITIES: ReadonlyArray<[RegExp, string]> = [
-  [/&lt;/g, '<'],
-  [/&gt;/g, '>'],
-  [/&quot;/g, '"'],
-  [/&#39;|&apos;/g, "'"],
-  [/&nbsp;/g, ' '],
-  [/&amp;/g, '&'],
-];
-
 /**
- * Strip HTML tags (the feed wraps trail names in anchors), decode the common
- * entities the markup leaves behind, and collapse whitespace.
+ * Strip HTML tags (the feed wraps trail names in anchors), decode the entities
+ * the markup leaves behind via mcp-utils' `decodeHtmlEntities` (numeric +
+ * `&nbsp;/&lt;/&gt;/&quot;/&apos;`, with `&amp;` last so `&amp;lt;` → `&lt;`),
+ * and collapse whitespace. Tags are removed with no separator — unlike scrape's
+ * `stripHtml`, which inserts a space — to preserve this repo's feed-description
+ * output exactly.
  */
 function stripHtml(s: string): string {
-  let out = s.replace(/<[^>]*>/g, '');
-  out = out.replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)));
-  out = out.replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number(dec)));
-  for (const [pattern, replacement] of NAMED_ENTITIES) out = out.replace(pattern, replacement);
-  return out.replace(/\s+/g, ' ').trim();
+  return decodeHtmlEntities(s.replace(/<[^>]*>/g, ''))
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Return a trimmed string, or undefined when it is null/empty/whitespace. */

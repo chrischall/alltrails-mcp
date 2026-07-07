@@ -25,7 +25,7 @@ describe('parseAllTrails', () => {
 
   it('strict: throws with a precise message on mismatch', () => {
     expect(() => parseAllTrails(Schema, { id: 'x' }, 'POST reviews', 'strict')).toThrow(
-      /AllTrails response for POST reviews failed validation: id:/,
+      /Unexpected POST reviews shape from the upstream API\. id:/,
     );
   });
 
