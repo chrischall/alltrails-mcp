@@ -31,7 +31,7 @@ Every API request routes through the **fetchproxy** browser bridge — it runs a
 
 ## Tools
 
-### Discovery (no sign-in required beyond a valid session cookie)
+### Discovery (still routed through the signed-in fetchproxy bridge)
 | Tool | Notes |
 |------|-------|
 | `alltrails_search(query?, types?, lat?, lng?, limit?, compact?)` | Search AllTrails by name. A free-text `query` uses the same suggestions endpoint as the alltrails.com search box (good relevance; may mix record types — pass `types: ["trail"]` for trails only). `lat`/`lng` are ignored by the API (results carry an implicit account/IP geo bias). Use `compact=true` (strongly recommended). |
