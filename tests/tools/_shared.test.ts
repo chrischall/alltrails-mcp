@@ -9,6 +9,7 @@ import {
   summarizePhoto,
   summarizeSearchResult,
   summarizeFeedItem,
+  summarizeListItem,
   fetchTrailListing,
 } from '../../src/tools/_shared.js';
 
@@ -397,6 +398,45 @@ describe('summarizeFeedItem', () => {
     });
     expect(s.review).toEqual({ rating: 5, comment: 'Lovely loop.' });
     expect(s.activity).toEqual({ name: 'Afternoon walk' });
+  });
+});
+
+describe('summarizeListItem', () => {
+  it('projects the captured list-item shape (a sparse trail reference)', () => {
+    // Captured 2026-07-08: GET /api/alltrails/lists/{id}/items →
+    // { listItems: [{ id, listId, type, order, notes, trailId, metadata }] }.
+    // Items carry NO trail details — only a trailId to hydrate via get_trail.
+    expect(summarizeListItem({
+      id: 665396,
+      listId: 13572468,
+      type: 'trail',
+      order: 1,
+      notes: 'Great in fall',
+      trailId: 10264089,
+      metadata: { status: 'A', created: '2017-08-11T16:50:35Z', updated: '2022-04-29T19:56:02Z' },
+    })).toEqual({
+      trailId: '10264089',
+      type: 'trail',
+      order: 1,
+      notes: 'Great in fall',
+      addedAt: '2017-08-11T16:50:35Z',
+    });
+  });
+
+  it('omits null notes and a missing metadata block', () => {
+    const s = summarizeListItem({ trailId: 42, type: 'trail', order: 2, notes: null });
+    expect(s).toEqual({ trailId: '42', type: 'trail', order: 2 });
+    expect(JSON.stringify(s)).not.toContain('notes');
+    expect(JSON.stringify(s)).not.toContain('addedAt');
+  });
+
+  it('leaves trailId undefined when absent', () => {
+    expect(summarizeListItem({ type: 'map', order: 1 }).trailId).toBeUndefined();
+  });
+
+  it('maps null type and order to omitted fields', () => {
+    const s = summarizeListItem({ trailId: 7, type: null, order: null, notes: null });
+    expect(s).toEqual({ trailId: '7' });
   });
 });
 

@@ -457,6 +457,47 @@ export function summarizeFeedItem(raw: RawFeedItemData): FeedItemSummary {
   };
 }
 
+// A single entry from `GET /api/alltrails/lists/{id}/items` (captured
+// 2026-07-08). Items are SPARSE references — they carry a `trailId` to hydrate
+// via alltrails_get_trail, plus the curator's ordering and notes. No trail
+// details are inlined. Loose as always.
+const RawListItemSchema = z.looseObject({
+  trailId: z.union([z.number(), z.string()]).optional(),
+  type: z.string().nullish(),
+  order: z.number().nullish(),
+  notes: z.string().nullish(),
+  metadata: z.looseObject({ created: z.string().nullish() }).nullish(),
+});
+type RawListItem = z.infer<typeof RawListItemSchema>;
+
+// List-items envelope: `{ listItems: [...], meta: { items } }`.
+export const ListItemsSchema = z.looseObject({
+  listItems: z.array(RawListItemSchema).optional(),
+  meta: z.looseObject({ items: z.number().nullish() }).nullish(),
+});
+
+/** A compact projection of one saved-list entry. */
+export interface ListItemSummary {
+  /** The referenced trail id — hydrate via alltrails_get_trail. */
+  trailId?: string;
+  type?: string;
+  /** The curator's position in the list. */
+  order?: number;
+  notes?: string;
+  addedAt?: string;
+}
+
+/** Project a raw list item into a {@link ListItemSummary}. */
+export function summarizeListItem(raw: RawListItem): ListItemSummary {
+  return {
+    trailId: raw.trailId === undefined ? undefined : `${raw.trailId}`,
+    type: raw.type ?? undefined,
+    order: raw.order ?? undefined,
+    notes: raw.notes ?? undefined,
+    addedAt: raw.metadata?.created ?? undefined,
+  };
+}
+
 /**
  * GET a trail-listing endpoint and return the tool result. Validates the
  * envelope (lenient — drift warns to stderr, never throws). When `compact` is
