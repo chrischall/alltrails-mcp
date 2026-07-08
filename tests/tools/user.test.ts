@@ -49,6 +49,50 @@ describe('alltrails_list_user_lists', () => {
   });
 });
 
+describe('alltrails_get_list_items', () => {
+  it('GETs the list-items endpoint for the given list id', async () => {
+    const { client, handlers } = setup({ listItems: [], meta: { items: 0 } });
+    await handlers.get('alltrails_get_list_items')!({ listId: '13572468' });
+    expect(client.request).toHaveBeenCalledWith('GET', '/api/alltrails/lists/13572468/items');
+  });
+
+  it('does not resolve a user id (lists are addressed by list id, not user)', async () => {
+    const { client, handlers } = setup({ listItems: [] });
+    await handlers.get('alltrails_get_list_items')!({ listId: '5' });
+    expect(client.request).toHaveBeenCalledTimes(1);
+    expect(client.request).not.toHaveBeenCalledWith('GET', '/api/alltrails/me');
+  });
+
+  it('compact=true returns ordered slim items with paging meta', async () => {
+    const { handlers } = setup({
+      listItems: [
+        { trailId: 200, type: 'trail', order: 2, notes: null, metadata: { created: '2020-01-02T00:00:00Z' } },
+        { trailId: 300, type: 'trail' }, // no order → sorts last
+        { trailId: 100, type: 'trail', order: 1, notes: 'First', metadata: { created: '2019-01-01T00:00:00Z' } },
+      ],
+      meta: { items: 3 },
+    });
+    const result = await handlers.get('alltrails_get_list_items')!({ listId: '5', compact: true });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.count).toBe(3);
+    // Sorted by the curator's order, order-less items last.
+    expect(parsed.items).toEqual([
+      { trailId: '100', type: 'trail', order: 1, notes: 'First', addedAt: '2019-01-01T00:00:00Z' },
+      { trailId: '200', type: 'trail', order: 2, addedAt: '2020-01-02T00:00:00Z' },
+      { trailId: '300', type: 'trail' },
+    ]);
+  });
+
+  it('compact=true falls back to raw when the shape drifted', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const drifted = { listItems: 'nope' };
+    const { handlers } = setup(drifted);
+    const result = await handlers.get('alltrails_get_list_items')!({ listId: '5', compact: true });
+    expect(JSON.parse(result.content[0].text)).toEqual(drifted);
+    expect(errSpy).toHaveBeenCalled();
+  });
+});
+
 describe('alltrails_list_completed_trails', () => {
   it('GETs the completed-trails endpoint for the resolved user', async () => {
     process.env.ALLTRAILS_USER_ID = '333';

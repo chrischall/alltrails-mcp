@@ -6,8 +6,10 @@ import {
   FeedDirectorySchema,
   FeedPageSchema,
   jsonResponse,
+  ListItemsSchema,
   resolveUserId,
   summarizeFeedItem,
+  summarizeListItem,
 } from './_shared.js';
 
 // Per-user read tools. These require a signed-in session (the captured browser
@@ -34,6 +36,31 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
     const userId = await resolveUserId(client, args.userId);
     const data = await client.request('GET', `/api/alltrails/users/${encodeURIComponent(userId)}/lists`);
     return jsonResponse(data);
+  });
+
+  server.registerTool('alltrails_get_list_items', {
+    description:
+      'Get the trails saved in an AllTrails list by its numeric list id (from alltrails_list_user_lists, ' +
+      'or a public "list" record from alltrails_search). Items are sparse references: each carries a ' +
+      'trailId (hydrate with alltrails_get_trail), the curator\'s order, and any notes — not trail ' +
+      'details. Set compact=true for slim { trailId, type, order, notes, addedAt } entries sorted by order.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      listId: z.string().describe('Numeric AllTrails list id'),
+      compact: z.boolean().describe('Return slim per-item entries sorted by order (default false)').optional(),
+    },
+  }, async (args) => {
+    const raw = await client.request('GET', `/api/alltrails/lists/${encodeURIComponent(args.listId)}/items`);
+    if (args.compact) {
+      const parsed = parseAllTrails(ListItemsSchema, raw, 'GET /api/alltrails/lists/{id}/items');
+      if (Array.isArray(parsed.listItems)) {
+        const items = parsed.listItems
+          .map(summarizeListItem)
+          .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+        return jsonResponse({ count: items.length, items });
+      }
+    }
+    return jsonResponse(raw);
   });
 
   server.registerTool('alltrails_list_completed_trails', {
