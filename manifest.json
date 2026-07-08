@@ -64,16 +64,16 @@
       "description": "Get the weather overview for a trail"
     },
     {
+      "name": "alltrails_get_trail_gpx",
+      "description": "Export a trail's route as a GPX 1.1 document"
+    },
+    {
       "name": "alltrails_search",
       "description": "Search AllTrails by trail or place name"
     },
     {
-      "name": "alltrails_list_trails_by_state",
-      "description": "List trails within a state/region (paginated)"
-    },
-    {
-      "name": "alltrails_list_trails_by_country",
-      "description": "List trails within a country (paginated)"
+      "name": "alltrails_resolve_location",
+      "description": "Resolve a place name to AllTrails location records"
     },
     {
       "name": "alltrails_get_profile",
@@ -82,6 +82,10 @@
     {
       "name": "alltrails_list_user_lists",
       "description": "List a user's saved lists / favorites"
+    },
+    {
+      "name": "alltrails_get_list_items",
+      "description": "Get the trails saved in a list by its id"
     },
     {
       "name": "alltrails_list_completed_trails",
