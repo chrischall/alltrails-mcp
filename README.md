@@ -108,6 +108,7 @@ All tools are **read-only** — this server never writes to AllTrails.
 | Tool | What it does |
 |------|-------------|
 | `alltrails_search` | Search AllTrails by trail or place name — free-text queries use the same suggestions endpoint as the alltrails.com search box (`compact` strongly recommended; `types: ["trail"]` narrows to trails only) |
+| `alltrails_resolve_location` | Resolve a place name to AllTrails location records (country/state/city/area/POI) with each one's kind, coordinates, slug, and disambiguation label |
 | `alltrails_list_trails_by_state` | Paginated listing of trails in a state/region (`compact` for slim summaries) |
 | `alltrails_list_trails_by_country` | Paginated listing of trails in a country, e.g. `313` = US (`compact` supported) |
 | `alltrails_get_trail` | Trail details (`detail`: `basic`/`medium`/`offline`; `compact` for a slim projection) |

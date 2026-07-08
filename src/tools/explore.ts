@@ -2,7 +2,18 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
 import { parseAllTrails } from '../validate.js';
-import { fetchTrailListing, jsonResponse, SearchResponseSchema, summarizeSearchResult } from './_shared.js';
+import {
+  fetchTrailListing,
+  jsonResponse,
+  LocationSuggestSchema,
+  SearchResponseSchema,
+  summarizeLocation,
+  summarizeSearchResult,
+} from './_shared.js';
+
+// The location record types the geocoder requests (a subset of the suggestions
+// record types — places and points of interest, not trails/guides/lists).
+const LOCATION_RECORD_TYPES = ['country', 'state', 'city', 'area', 'poi'] as const;
 
 // The record types the alltrails.com explore search box requests (its request
 // body was captured verbatim 2026-07-02); also the accepted values for the
@@ -69,6 +80,37 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
         const results = parsed.searchResults.slice(0, limit).map(summarizeSearchResult);
         return jsonResponse({ totalCount: parsed.summary?.count ?? undefined, count: results.length, results });
       }
+    }
+    return jsonResponse(raw);
+  });
+
+  server.registerTool('alltrails_resolve_location', {
+    description:
+      'Resolve a place name to AllTrails location records — country / state / city / area / point of ' +
+      'interest — with each one\'s kind, coordinates, URL slug, and disambiguation label. Useful for ' +
+      'pinning down which "Oregon" (state vs the towns) or getting a place\'s coordinates/slug. ' +
+      'NOTE: the returned id is an Algolia search id and is NOT the id the trail-listing tools take; ' +
+      'to find trails for a place, feed the resolved name back into alltrails_search.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      query: z.string().describe('Place name to resolve, e.g. "portland oregon" or "zion"'),
+      kinds: z
+        .array(z.enum(LOCATION_RECORD_TYPES))
+        .describe('Which place kinds to return (default: all — country, state, city, area, poi)')
+        .optional(),
+      limit: z.number().int().positive().describe('Max results to return (default 10)').optional(),
+    },
+  }, async (args) => {
+    const limit = args.limit ?? 10;
+    const raw = await client.request('POST', '/api/alltrails/explore/v1/suggestions', {
+      query: args.query,
+      limit,
+      recordTypesToReturn: args.kinds ?? [...LOCATION_RECORD_TYPES],
+    });
+    const parsed = parseAllTrails(LocationSuggestSchema, raw, 'POST /api/alltrails/explore/v1/suggestions (locations)');
+    if (Array.isArray(parsed.searchResults)) {
+      const locations = parsed.searchResults.slice(0, limit).map(summarizeLocation);
+      return jsonResponse({ count: locations.length, locations });
     }
     return jsonResponse(raw);
   });
