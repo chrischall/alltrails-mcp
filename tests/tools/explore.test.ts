@@ -163,3 +163,52 @@ describe('alltrails_list_trails_by_country', () => {
     expect(JSON.parse(result.content[0].text)).toEqual({ count: 1, trails: [{ id: '9', name: 'Loop' }] });
   });
 });
+
+describe('alltrails_resolve_location', () => {
+  it('POSTs the suggestions endpoint with location record types by default', async () => {
+    const { client, handlers } = setup({ searchResults: [] });
+    await handlers.get('alltrails_resolve_location')!({ query: 'portland' });
+    expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/explore/v1/suggestions', {
+      query: 'portland',
+      limit: 10,
+      recordTypesToReturn: ['country', 'state', 'city', 'area', 'poi'],
+    });
+  });
+
+  it('honors explicit kinds and limit', async () => {
+    const { client, handlers } = setup({ searchResults: [] });
+    await handlers.get('alltrails_resolve_location')!({ query: 'oregon', kinds: ['state', 'city'], limit: 3 });
+    expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/explore/v1/suggestions', {
+      query: 'oregon',
+      limit: 3,
+      recordTypesToReturn: ['state', 'city'],
+    });
+  });
+
+  it('projects the resolved locations and truncates to limit', async () => {
+    const { handlers } = setup({
+      searchResults: [
+        { type: 'place', location_type: 'city', ID: 6641, objectID: 'cityo-6641', slug: 'us/oregon/portland', name: 'Portland', state_name: 'Oregon', country_name: 'United States', _geoloc: { lat: 45.52, lng: -122.67 }, location_label: 'Oregon, United States' },
+        { type: 'place', location_type: 'state', ID: 38, objectID: 'state-38', slug: 'us/oregon', name: 'Oregon' },
+        { type: 'place', location_type: 'city', ID: 99, name: 'Portlandia' },
+      ],
+    });
+    const result = await handlers.get('alltrails_resolve_location')!({ query: 'portland', limit: 2 });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.count).toBe(2);
+    expect(parsed.locations[0]).toEqual({
+      name: 'Portland', kind: 'city', id: '6641', objectID: 'cityo-6641', slug: 'us/oregon/portland',
+      latitude: 45.52, longitude: -122.67, region: 'Oregon', country: 'United States', label: 'Oregon, United States',
+    });
+    expect(parsed.locations[1]).toEqual({ name: 'Oregon', kind: 'state', id: '38', objectID: 'state-38', slug: 'us/oregon' });
+  });
+
+  it('falls back to the raw response when the shape drifted', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const drifted = { searchResults: 'nope' };
+    const { handlers } = setup(drifted);
+    const result = await handlers.get('alltrails_resolve_location')!({ query: 'x' });
+    expect(JSON.parse(result.content[0].text)).toEqual(drifted);
+    expect(errSpy).toHaveBeenCalled();
+  });
+});

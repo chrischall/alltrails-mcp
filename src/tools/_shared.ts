@@ -340,6 +340,66 @@ export function summarizeSearchResult(raw: RawSearchResult): SearchResultSummary
   };
 }
 
+// A location record from `POST /explore/v1/suggestions` when queried with the
+// place record types (captured 2026-07-08). `location_type` is the granular
+// kind (country/state/city/area/poi); `type` is the coarser Algolia bucket
+// (place/area/poi). `objectID` carries the namespace prefix (state-38,
+// cityo-6641, area-N). Loose as always.
+const RawLocationSchema = z.looseObject({
+  type: z.string().nullish(),
+  location_type: z.string().nullish(),
+  ID: z.union([z.number(), z.string()]).optional(),
+  objectID: z.string().nullish(),
+  slug: z.string().nullish(),
+  name: z.string().nullish(),
+  state_name: z.string().nullish(),
+  country_name: z.string().nullish(),
+  location_label: z.string().nullish(),
+  _geoloc: z.looseObject({ lat: z.number().nullish(), lng: z.number().nullish() }).nullish(),
+});
+type RawLocation = z.infer<typeof RawLocationSchema>;
+
+// Suggestions envelope for a location query: same `{ searchResults, summary }`
+// as the trail search.
+export const LocationSuggestSchema = z.looseObject({
+  searchResults: z.array(RawLocationSchema).optional(),
+});
+
+/** A resolved AllTrails place — coordinates, slug, and granularity for a location name. */
+export interface LocationSummary {
+  name?: string;
+  /** Granular place kind: country | state | city | area | poi. */
+  kind?: string;
+  /** Numeric Algolia search id. NOTE: this is NOT the id the trail-listing tools take. */
+  id?: string;
+  /** Namespace-prefixed id (e.g. "cityo-6641", "state-38", "area-N"). */
+  objectID?: string;
+  /** URL slug usable on alltrails.com (e.g. "us/oregon/portland"). */
+  slug?: string;
+  latitude?: number;
+  longitude?: number;
+  region?: string;
+  country?: string;
+  /** Human disambiguation label, e.g. "Oregon, United States". */
+  label?: string;
+}
+
+/** Project a raw suggestions place record into a {@link LocationSummary}. */
+export function summarizeLocation(raw: RawLocation): LocationSummary {
+  return {
+    name: raw.name ?? undefined,
+    kind: raw.location_type ?? raw.type ?? undefined,
+    id: raw.ID === undefined ? undefined : `${raw.ID}`,
+    objectID: raw.objectID ?? undefined,
+    slug: raw.slug ?? undefined,
+    latitude: raw._geoloc?.lat ?? undefined,
+    longitude: raw._geoloc?.lng ?? undefined,
+    region: raw.state_name ?? undefined,
+    country: raw.country_name ?? undefined,
+    label: raw.location_label ?? undefined,
+  };
+}
+
 // The itemData of a `feed-item` section from `GET .../feeds/{name}` (captured
 // 2026-07-02). Only the projected fields are named; loose as always.
 const RawFeedItemDataSchema = z.looseObject({

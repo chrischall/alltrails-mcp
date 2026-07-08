@@ -10,6 +10,7 @@ import {
   summarizeSearchResult,
   summarizeFeedItem,
   summarizeListItem,
+  summarizeLocation,
   fetchTrailListing,
 } from '../../src/tools/_shared.js';
 
@@ -437,6 +438,68 @@ describe('summarizeListItem', () => {
   it('maps null type and order to omitted fields', () => {
     const s = summarizeListItem({ trailId: 7, type: null, order: null, notes: null });
     expect(s).toEqual({ trailId: '7' });
+  });
+});
+
+describe('summarizeLocation', () => {
+  it('projects a captured place record, preferring location_type as the kind', () => {
+    // Captured 2026-07-08: POST /explore/v1/suggestions place record.
+    expect(summarizeLocation({
+      type: 'place',
+      location_type: 'city',
+      ID: 6641,
+      objectID: 'cityo-6641',
+      slug: 'us/oregon/portland',
+      name: 'Portland',
+      state_name: 'Oregon',
+      country_name: 'United States',
+      _geoloc: { lat: 45.5202, lng: -122.6742 },
+      location_label: 'Oregon, United States',
+    })).toEqual({
+      name: 'Portland',
+      kind: 'city',
+      id: '6641',
+      objectID: 'cityo-6641',
+      slug: 'us/oregon/portland',
+      latitude: 45.5202,
+      longitude: -122.6742,
+      region: 'Oregon',
+      country: 'United States',
+      label: 'Oregon, United States',
+    });
+  });
+
+  it('projects an area record (parks slug, area kind)', () => {
+    const s = summarizeLocation({
+      type: 'area',
+      location_type: 'area',
+      ID: 10148763,
+      objectID: 'area-10148763',
+      slug: 'parks/us/oregon/portland-heights-park',
+      name: 'Portland Heights Park',
+      _geoloc: { lat: 45.5042073, lng: -122.7080829 },
+      country_name: 'United States',
+      location_label: 'Oregon, United States',
+    });
+    expect(s.kind).toBe('area');
+    expect(s.slug).toBe('parks/us/oregon/portland-heights-park');
+    expect(s.region).toBeUndefined();
+  });
+
+  it('falls back to type when location_type is absent, and omits a missing geoloc', () => {
+    const s = summarizeLocation({ type: 'poi', ID: 5, name: 'X' });
+    expect(s.kind).toBe('poi');
+    expect(s.latitude).toBeUndefined();
+    expect(s.longitude).toBeUndefined();
+    expect(JSON.stringify(s)).toBe('{"name":"X","kind":"poi","id":"5"}');
+  });
+
+  it('projects an empty record to an empty object (all fields absent)', () => {
+    const s = summarizeLocation({});
+    expect(s.id).toBeUndefined();
+    expect(s.name).toBeUndefined();
+    expect(s.kind).toBeUndefined();
+    expect(JSON.stringify(s)).toBe('{}');
   });
 });
 

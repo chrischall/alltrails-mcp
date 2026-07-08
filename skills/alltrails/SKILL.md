@@ -37,6 +37,7 @@ Every API request routes through the **fetchproxy** browser bridge — it runs a
 | `alltrails_search(query?, types?, lat?, lng?, limit?, compact?)` | Search AllTrails by name. A free-text `query` uses the same suggestions endpoint as the alltrails.com search box (good relevance; may mix record types — pass `types: ["trail"]` for trails only). `lat`/`lng` are ignored by the API (results carry an implicit account/IP geo bias). Use `compact=true` (strongly recommended). |
 | `alltrails_list_trails_by_state(stateId, page?, perPage?, compact?)` | Paginated listing of trails in a state/region. `compact=true` returns a slim summary per trail (id, name, length, difficulty, rating, …) — far less output for browsing/ranking. |
 | `alltrails_list_trails_by_country(countryId, page?, perPage?, compact?)` | Paginated listing of trails in a country (e.g. `313` = US). Supports `compact`. |
+| `alltrails_resolve_location(query, kinds?, limit?)` | Resolve a place name to AllTrails location records — `country`/`state`/`city`/`area`/`poi` — each with `{ name, kind, id, slug, latitude, longitude, region, country, label }`. Good for disambiguating (which "Oregon"?) or getting a place's coordinates/slug. The returned `id` is a search id — it does **not** feed the listing tools; to find trails for a place, feed the name back into `alltrails_search`. |
 
 ### Trail detail
 | Tool | Notes |
