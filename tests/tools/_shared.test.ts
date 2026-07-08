@@ -11,7 +11,6 @@ import {
   summarizeFeedItem,
   summarizeListItem,
   summarizeLocation,
-  fetchTrailListing,
 } from '../../src/tools/_shared.js';
 
 afterEach(() => {
@@ -500,51 +499,5 @@ describe('summarizeLocation', () => {
     expect(s.name).toBeUndefined();
     expect(s.kind).toBeUndefined();
     expect(JSON.stringify(s)).toBe('{}');
-  });
-});
-
-describe('fetchTrailListing', () => {
-  const listing = {
-    trails: [
-      { objectID: 1, name: 'A', length: 1000, difficulty_rating: 3, avg_rating: 4.1 },
-      { objectID: 2, name: 'B' },
-    ],
-  };
-
-  it('returns a slim summary array when compact is true', async () => {
-    const c = clientReturning(listing);
-    const result = await fetchTrailListing(c, '/api/alltrails/locations/states/9/trails', 'ctx', true);
-    expect(c.request).toHaveBeenCalledWith('GET', '/api/alltrails/locations/states/9/trails');
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.count).toBe(2);
-    expect(parsed.trails[0]).toEqual({
-      id: '1', name: 'A', lengthMeters: 1000, lengthMiles: 0.62, difficulty: 3, rating: 4.1,
-    });
-    expect(parsed.trails[1]).toEqual({ id: '2', name: 'B' });
-  });
-
-  it('returns the raw response when compact is false', async () => {
-    const c = clientReturning(listing);
-    const result = await fetchTrailListing(c, '/x', 'ctx', false);
-    expect(JSON.parse(result.content[0].text)).toEqual(listing);
-  });
-
-  it('falls back to the raw response when compact is true but the shape drifted (no trails array)', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const drifted = { results: [{ name: 'X' }] }; // `trails` absent
-    const c = clientReturning(drifted);
-    const result = await fetchTrailListing(c, '/x', 'GET listing', true);
-    expect(JSON.parse(result.content[0].text)).toEqual(drifted);
-    // A present-but-wrong shape would warn; an absent optional key does not.
-    expect(errSpy).not.toHaveBeenCalled();
-  });
-
-  it('warns and falls back to raw when trails is present but the wrong type', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const bad = { trails: 'not-an-array' };
-    const c = clientReturning(bad);
-    const result = await fetchTrailListing(c, '/x', 'GET listing', true);
-    expect(JSON.parse(result.content[0].text)).toEqual(bad);
-    expect(String(errSpy.mock.calls[0][0])).toContain('GET listing');
   });
 });

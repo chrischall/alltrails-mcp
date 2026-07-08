@@ -67,11 +67,6 @@ const RawTrailSchema = z.looseObject({
 });
 type RawTrail = z.infer<typeof RawTrailSchema>;
 
-// Listing envelope: the endpoints wrap the results in `{ trails: [...] }`.
-export const TrailListSchema = z.looseObject({
-  trails: z.array(RawTrailSchema).optional(),
-});
-
 /** A compact, agent-friendly projection of a listing trail — the fields worth ranking on. */
 export interface TrailSummary {
   id?: string;
@@ -556,26 +551,4 @@ export function summarizeListItem(raw: RawListItem): ListItemSummary {
     notes: raw.notes ?? undefined,
     addedAt: raw.metadata?.created ?? undefined,
   };
-}
-
-/**
- * GET a trail-listing endpoint and return the tool result. Validates the
- * envelope (lenient — drift warns to stderr, never throws). When `compact` is
- * set and the response carried the expected `trails` array, returns a slim
- * `{ count, trails: TrailSummary[] }`; otherwise returns the raw response
- * unchanged (full detail, and the safe fallback if the shape drifted).
- */
-export async function fetchTrailListing(
-  client: AllTrailsClient,
-  path: string,
-  ctx: string,
-  compact: boolean,
-): Promise<ReturnType<typeof jsonResponse>> {
-  const raw = await client.request('GET', path);
-  const parsed = parseAllTrails(TrailListSchema, raw, ctx);
-  if (compact && Array.isArray(parsed.trails)) {
-    const trails = parsed.trails.map(summarizeTrail);
-    return jsonResponse({ count: trails.length, trails });
-  }
-  return jsonResponse(raw);
 }
