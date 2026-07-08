@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.0.0](https://github.com/chrischall/alltrails-mcp/compare/v1.1.0...v2.0.0) (2026-07-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* the alltrails_list_trails_by_state and alltrails_list_trails_by_country tools are removed. Use alltrails_search to find trails for a location.
+
+### Features
+
+* alltrails_get_list_items — the trails saved in a list ([#23](https://github.com/chrischall/alltrails-mcp/issues/23)) ([daf2fb8](https://github.com/chrischall/alltrails-mcp/commit/daf2fb843f908e9b27ae9ec2e4c3fda1c5199501))
+* alltrails_resolve_location — resolve a place name to AllTrails location records ([#27](https://github.com/chrischall/alltrails-mcp/issues/27)) ([949a647](https://github.com/chrischall/alltrails-mcp/commit/949a647a39961fa6388ac9d72d220e5b12d1c6e0))
+* remove list_trails_by_state / list_trails_by_country (endpoint retired) ([#29](https://github.com/chrischall/alltrails-mcp/issues/29)) ([360d8a1](https://github.com/chrischall/alltrails-mcp/commit/360d8a1dc0fa89d929851f0c14f0cd1b10171853)), closes [#24](https://github.com/chrischall/alltrails-mcp/issues/24)
+
+
+### Documentation
+
+* correct alltrails_get_list_items compact field list ([#28](https://github.com/chrischall/alltrails-mcp/issues/28)) ([3a46db2](https://github.com/chrischall/alltrails-mcp/commit/3a46db240d09f4b17558fbd1bb2942015e03a4b5)), closes [#25](https://github.com/chrischall/alltrails-mcp/issues/25)
+
 ## [1.1.0](https://github.com/chrischall/alltrails-mcp/compare/v1.0.0...v1.1.0) (2026-07-07)
 
 
