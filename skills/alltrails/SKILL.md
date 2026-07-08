@@ -51,7 +51,7 @@ Every API request routes through the **fetchproxy** browser bridge — it runs a
 |------|-------|
 | `alltrails_get_profile` | The signed-in user's profile (`/api/alltrails/me`). |
 | `alltrails_list_user_lists(userId?)` | Saved lists / favorites. Defaults to the signed-in user. |
-| `alltrails_get_list_items(listId, compact?)` | The trails saved in a list, by list id (from `list_user_lists`, or a public `list` record from `search`). Items are **sparse references** — each is `{ trailId, order, notes, addedAt }`; hydrate details with `get_trail`. `compact=true` sorts by the curator's order. |
+| `alltrails_get_list_items(listId, compact?)` | The trails saved in a list, by list id (from `list_user_lists`, or a public `list` record from `search`). Items are **sparse references** — each is `{ trailId, type, order, notes, addedAt }`; hydrate details with `get_trail`. `compact=true` sorts by the curator's order. |
 | `alltrails_list_completed_trails(userId?)` | Trails marked completed. Defaults to the signed-in user. |
 | `alltrails_get_activity_feed(userId?, feed?, maxItems?, cursor?, compact?)` | Activity feed. Without `feed` it returns the feed **directory**; pass `feed`: `local` (nearby activity) \| `timeline` (people you follow) \| `personal` (own posts) for the actual items. Paginate with `cursor` (from `nextCursor`). `compact=true` returns slim items (type, timestamp, user, trail, activity stats, review). |
 

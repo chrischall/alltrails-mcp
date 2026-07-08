@@ -116,7 +116,7 @@ All tools are **read-only** — this server never writes to AllTrails.
 | `alltrails_get_trail_weather` | Weather overview for a trail |
 | `alltrails_get_profile` | The signed-in user's profile |
 | `alltrails_list_user_lists` | A user's saved lists / favorites |
-| `alltrails_get_list_items` | The trails saved in a list, by list id (`compact` for ordered `{trailId, order, notes}` — hydrate each via `get_trail`) |
+| `alltrails_get_list_items` | The trails saved in a list, by list id (`compact` for ordered `{trailId, type, order, notes, addedAt}` — hydrate each via `get_trail`) |
 | `alltrails_list_completed_trails` | A user's completed trails |
 | `alltrails_get_activity_feed` | A user's activity feed (`feed`: `local`/`timeline`/`personal` for the items, omit for the directory; `cursor` paginates; `compact` for slim items) |
 | `alltrails_healthcheck` | Round-trips a probe through the fetchproxy bridge and reports role/port/timing plus a plain-English hint about which hop broke |
