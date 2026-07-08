@@ -4,8 +4,9 @@
 #   1. Ruleset "Block force-push and deletion on main" — non-fast-forward and
 #      branch deletion blocked.
 #   2. Ruleset "main protection (PR + ci)" — every change lands via PR, the
-#      "ci / ci" status check must pass, strict mode (branch up-to-date with
-#      main). No bypass actors; admins are not exempt.
+#      "ci / ci" status check must pass. Non-strict: a PR need NOT be up to
+#      date with main to merge (out-of-date PRs merge without a rebase). No
+#      bypass actors; admins are not exempt.
 #   3. Repo merge settings — squash-only (merge commits and rebase disabled),
 #      head branches auto-deleted on merge.
 #
@@ -65,7 +66,7 @@ apply_ruleset "main protection (PR + ci)" '{
     {
       "type": "required_status_checks",
       "parameters": {
-        "strict_required_status_checks_policy": true,
+        "strict_required_status_checks_policy": false,
         "required_status_checks": [ { "context": "ci / ci" } ]
       }
     }
