@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/chrischall/alltrails-mcp/compare/v2.0.0...v2.1.0) (2026-07-13)
+
+
+### Features
+
+* **skill:** add alltrails fpx access skill ([#34](https://github.com/chrischall/alltrails-mcp/issues/34)) ([aacfe20](https://github.com/chrischall/alltrails-mcp/commit/aacfe202acc6f006fb8f1478995e18725ba1d4e9))
+
 ## [2.0.0](https://github.com/chrischall/alltrails-mcp/compare/v1.1.0...v2.0.0) (2026-07-08)
 
 

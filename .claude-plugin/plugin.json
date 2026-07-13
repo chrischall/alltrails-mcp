@@ -1,7 +1,7 @@
 {
   "name": "alltrails",
   "displayName": "AllTrails",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Unofficial AllTrails tools for Claude — search trails, get details, reviews, photos, and saved lists via MCP",
   "author": {
     "name": "Chris Chall"
