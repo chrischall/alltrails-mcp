@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "AllTrails tools for Claude Code",
-    "version": "2.0.0"
+    "version": "2.1.0"
   },
   "plugins": [
     {
@@ -14,7 +14,7 @@
       "displayName": "AllTrails",
       "source": "./",
       "description": "Unofficial AllTrails tools for Claude — search trails, get details, reviews, photos, and saved lists via MCP",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "author": {
         "name": "Chris Chall"
       },
