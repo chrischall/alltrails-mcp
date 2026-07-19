@@ -4,7 +4,7 @@
 #   1. Ruleset "Block force-push and deletion on main" — non-fast-forward and
 #      branch deletion blocked.
 #   2. Ruleset "main protection (PR + ci)" — every change lands via PR, the
-#      "ci / ci" status check must pass. Non-strict: a PR need NOT be up to
+#      "ci-gated" status check must pass. Non-strict: a PR need NOT be up to
 #      date with main to merge (out-of-date PRs merge without a rebase). No
 #      bypass actors; admins are not exempt.
 #   3. Repo merge settings — squash-only (merge commits and rebase disabled),
@@ -13,8 +13,12 @@
 # Requires: gh CLI authenticated with admin access to the repo. Idempotent —
 # reruns update the existing rulesets in place.
 #
-# NOTE: the required check is "ci / ci" (not "ci") because ci.yml calls the
-# reusable chrischall/workflows pipeline, which nests the job name.
+# NOTE: the required check is the "ci-gated" COMMIT STATUS, not a job name.
+# CI runs the shared arm-gate in status mode, which posts `ci-gated` itself:
+# yellow/pending on an un-armed PR, green once pr-auto-review arms it and CI
+# passes. This script previously wrote "ci / ci" — a job name that nothing
+# reports under status mode — so running it would have replaced a working
+# ruleset with a required check that can never go green.
 
 set -euo pipefail
 
@@ -67,7 +71,7 @@ apply_ruleset "main protection (PR + ci)" '{
       "type": "required_status_checks",
       "parameters": {
         "strict_required_status_checks_policy": false,
-        "required_status_checks": [ { "context": "ci / ci" } ]
+        "required_status_checks": [ { "context": "ci-gated" } ]
       }
     }
   ]
