@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/chrischall/alltrails-mcp/compare/v2.1.0...v2.1.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* require the ci-gated status, not the ci / ci job name ([#38](https://github.com/chrischall/alltrails-mcp/issues/38)) ([535cc26](https://github.com/chrischall/alltrails-mcp/commit/535cc260c0abb99918515168c6964900e76868c8))
+
 ## [2.1.0](https://github.com/chrischall/alltrails-mcp/compare/v2.0.0...v2.1.0) (2026-07-13)
 
 
