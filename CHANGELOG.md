@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.2](https://github.com/chrischall/alltrails-mcp/compare/v2.1.1...v2.1.2) (2026-07-30)
+
+
+### Bug Fixes
+
+* **deps:** bump @fetchproxy/* to 1.7.0 and @chrischall/mcp-utils to 0.14.0 ([#50](https://github.com/chrischall/alltrails-mcp/issues/50)) ([68a3644](https://github.com/chrischall/alltrails-mcp/commit/68a36445fb01b7aa7ac47a71d56f3d26f5f40ad1))
+
 ## [2.1.1](https://github.com/chrischall/alltrails-mcp/compare/v2.1.0...v2.1.1) (2026-07-25)
 
 
