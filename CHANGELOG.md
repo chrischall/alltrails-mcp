@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.3](https://github.com/chrischall/alltrails-mcp/compare/v2.1.2...v2.1.3) (2026-08-06)
+
+
+### Bug Fixes
+
+* **deps:** move to @fetchproxy/server 2.0.0 for the v3 handshake ([#56](https://github.com/chrischall/alltrails-mcp/issues/56)) ([a781d49](https://github.com/chrischall/alltrails-mcp/commit/a781d49f70c9c569b53ec1805552b01a4d2f8307))
+
 ## [2.1.2](https://github.com/chrischall/alltrails-mcp/compare/v2.1.1...v2.1.2) (2026-07-30)
 
 
