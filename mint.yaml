@@ -1,0 +1,39 @@
+version: 1
+name: AllTrails
+slug: alltrails
+summary: >-
+  AllTrails trails, reviews and saved lists. BROWSER-BRIDGE MCP: it reaches
+  alltrails.com through the user's signed-in tab via the fetchproxy bridge, so a
+  registration also needs runtime `fly-shared`, `bridge: true` and
+  `bridgePortEnv: ALLTRAILS_WS_PORT` — none of which this manifest can express
+  (they are registration fields, set over the control API). dataDir below is
+  required for bridge and is why it is declared.
+env:
+  - name: ALLTRAILS_WS_PORT
+    required: false
+    help: >-
+      Concentrator port for the fetchproxy bridge (defaults to the fleet-shared
+      37149). The runner injects a per-registration port for a hosted bridged
+      child, so this is the name to give `bridgePortEnv` at registration.
+  - name: ALLTRAILS_USER_ID
+    required: false
+    help: >-
+      Numeric AllTrails user id, used for the "my lists / completed trails"
+      reads. Discoverable from a signed-in session; optional for public search.
+  - name: ALLTRAILS_LOCALE
+    required: false
+    help: Locale for results (e.g. en-US). Defaults to the site default.
+  - name: ALLTRAILS_REQUEST_TIMEOUT_MS
+    required: false
+    help: Per-request timeout in milliseconds.
+state:
+  dataDir: true
+  reason: >-
+    The fetchproxy identity lives at $HOME/.fetchproxy/identity/<name>.json and
+    the pair code derives from it. Without a persistent $HOME every cold start
+    mints a fresh identity and re-prompts pairing in the user's browser — on a
+    scale-to-zero machine, constantly. The API refuses `bridge` without it.
+egress:
+  allow:
+    # The AllTrails site + its internal API, reached through the signed-in tab.
+    - www.alltrails.com
