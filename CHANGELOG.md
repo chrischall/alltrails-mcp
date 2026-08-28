@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.5](https://github.com/chrischall/alltrails-mcp/compare/v2.1.4...v2.1.5) (2026-08-28)
+
+
+### Bug Fixes
+
+* **egress:** declare every host the server dials in mint.yaml ([#71](https://github.com/chrischall/alltrails-mcp/issues/71)) ([cfec8d9](https://github.com/chrischall/alltrails-mcp/commit/cfec8d9e00570749b1187ab377951b3bea0acaf4))
+
 ## [2.1.4](https://github.com/chrischall/alltrails-mcp/compare/v2.1.3...v2.1.4) (2026-08-26)
 
 
