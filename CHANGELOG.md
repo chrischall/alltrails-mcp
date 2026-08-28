@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.4](https://github.com/chrischall/alltrails-mcp/compare/v2.1.3...v2.1.4) (2026-08-26)
+
+
+### Documentation
+
+* **skill:** declare the name this skill actually publishes under ([#68](https://github.com/chrischall/alltrails-mcp/issues/68)) ([496983b](https://github.com/chrischall/alltrails-mcp/commit/496983b7215b7973c3fad31a38cfc39dc896583a))
+
 ## [2.1.3](https://github.com/chrischall/alltrails-mcp/compare/v2.1.2...v2.1.3) (2026-08-06)
 
 
