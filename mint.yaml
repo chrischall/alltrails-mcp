@@ -34,6 +34,13 @@ state:
     mints a fresh identity and re-prompts pairing in the user's browser — on a
     scale-to-zero machine, constantly. The API refuses `bridge` without it.
 egress:
-  allow:
-    # The AllTrails site + its internal API, reached through the signed-in tab.
-    - www.alltrails.com
+  # Only hosts the SERVER process actually fetches. Hosts that appear solely
+  # in a URL this server BUILDS and returns are excluded — and so is the
+  # AllTrails site itself: every request to www.alltrails.com is a same-origin
+  # fetch executed in the user's signed-in TAB over the fetchproxy bridge
+  # (src/transport.ts), so the browser dials it, never this process. There is
+  # no direct mode. The process opens nothing outbound (the bridge is a
+  # loopback port the runner's agent connects TO), so the fence admits
+  # nothing. www.topografix.com is only an XML namespace string in the GPX
+  # this server builds (src/gpx.ts), not a dial.
+  allow: []
