@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/chrischall/alltrails-mcp/compare/v2.1.5...v2.2.0) (2026-08-29)
+
+
+### Features
+
+* **deps:** take @fetchproxy/server 2.2.0 so the concentrator can bind its sandbox address ([#73](https://github.com/chrischall/alltrails-mcp/issues/73)) ([558b527](https://github.com/chrischall/alltrails-mcp/commit/558b527c7f8c193761e9701a3c41407cb1aa0d50))
+
 ## [2.1.5](https://github.com/chrischall/alltrails-mcp/compare/v2.1.4...v2.1.5) (2026-08-28)
 
 
