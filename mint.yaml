@@ -26,6 +26,11 @@ env:
   - name: ALLTRAILS_REQUEST_TIMEOUT_MS
     required: false
     help: Per-request timeout in milliseconds.
+  - name: ALLTRAILS_DEBUG_LOG
+    required: false
+    help: >-
+      Set to a truthy value to log the landed browser-bridge role to stderr on
+      start. Unset, or an unexpanded ${...} placeholder, leaves logging off.
 state:
   dataDir: true
   reason: >-
