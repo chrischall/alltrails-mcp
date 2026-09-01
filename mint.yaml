@@ -29,8 +29,9 @@ env:
   - name: ALLTRAILS_DEBUG_LOG
     required: false
     help: >-
-      Set to a truthy value to log the landed browser-bridge role to stderr on
-      start. Unset, or an unexpanded ${...} placeholder, leaves logging off.
+      Set to a truthy value to log the browser bridge's per-request traffic to
+      stderr, plus the landed role on start. Unset, or an unexpanded ${...}
+      placeholder, leaves logging off.
 state:
   dataDir: true
   reason: >-
