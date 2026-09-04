@@ -73,7 +73,7 @@ describe('alltrails_search', () => {
     });
   });
 
-  it('compact=true projects suggestions results and enforces the limit client-side', async () => {
+  it('projects suggestions results and enforces the limit client-side', async () => {
     const { handlers } = setup({
       summary: { count: 500, displayText: '500+ trails' },
       searchResults: [
@@ -82,7 +82,7 @@ describe('alltrails_search', () => {
         { ID: 3, objectID: 'trail-3', type: 'trail', name: 'C' },
       ],
     });
-    const result = await handlers.get('alltrails_search')!({ query: 'park', limit: 2, compact: true });
+    const result = await handlers.get('alltrails_search')!({ query: 'park', limit: 2 });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.totalCount).toBe(500);
     expect(parsed.count).toBe(2);
@@ -92,20 +92,20 @@ describe('alltrails_search', () => {
     });
   });
 
-  it('compact=true works on the legacy no-query path and omits totalCount when summary is absent', async () => {
+  it('works on the legacy no-query path and omits totalCount when summary is absent', async () => {
     const { client, handlers } = setup({ searchResults: [{ ID: 1, name: 'A' }] });
-    const result = await handlers.get('alltrails_search')!({ compact: true });
+    const result = await handlers.get('alltrails_search')!({});
     expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/explore/v1/search', { limit: 20 });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.totalCount).toBeUndefined();
     expect(parsed.count).toBe(1);
   });
 
-  it('compact=true falls back to raw when the response shape drifted', async () => {
+  it('falls back to raw when the response shape drifted', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const drifted = { searchResults: 'nope' };
     const { handlers } = setup(drifted);
-    const result = await handlers.get('alltrails_search')!({ query: 'park', compact: true });
+    const result = await handlers.get('alltrails_search')!({ query: 'park' });
     expect(JSON.parse(result.content[0].text)).toEqual(drifted);
     expect(errSpy).toHaveBeenCalled();
   });

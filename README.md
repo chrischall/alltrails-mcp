@@ -107,21 +107,49 @@ All tools are **read-only** — this server never writes to AllTrails.
 
 | Tool | What it does |
 |------|-------------|
-| `alltrails_search` | Search AllTrails by trail or place name — free-text queries use the same suggestions endpoint as the alltrails.com search box (`compact` strongly recommended; `types: ["trail"]` narrows to trails only) |
+| `alltrails_search` | Search AllTrails by trail or place name — free-text queries use the same suggestions endpoint as the alltrails.com search box (`types: ["trail"]` narrows to trails only) |
 | `alltrails_resolve_location` | Resolve a place name to AllTrails location records (country/state/city/area/POI) with each one's kind, coordinates, slug, and disambiguation label |
-| `alltrails_get_trail` | Trail details (`detail`: `basic`/`medium`/`offline`; `compact` for a slim projection) |
-| `alltrails_get_trail_reviews` | User reviews for a trail (`compact` for `{user, rating, comment}`) |
-| `alltrails_get_trail_photos` | Photos for a trail (`compact` for slim records with a fetchable image `url`) |
+| `alltrails_get_trail` | Trail details — name, overview, length, elevation gain, difficulty, rating, route type, location (`detail`: `basic`/`medium`/`offline` picks what AllTrails sends us) |
+| `alltrails_get_trail_reviews` | User reviews for a trail — `{user, rating, comment}` each |
+| `alltrails_get_trail_photos` | Photos for a trail — slim records with a fetchable image `url` |
 | `alltrails_get_trail_gpx` | Export a trail's route as GPX 1.1 (track points + elevation) |
 | `alltrails_get_trail_weather` | Weather overview for a trail |
 | `alltrails_get_profile` | The signed-in user's profile |
 | `alltrails_list_user_lists` | A user's saved lists / favorites |
-| `alltrails_get_list_items` | The trails saved in a list, by list id (`compact` for ordered `{trailId, type, order, notes, addedAt}` — hydrate each via `get_trail`) |
+| `alltrails_get_list_items` | The trails saved in a list, by list id — ordered `{trailId, type, order, notes, addedAt}`, hydrate each via `get_trail` |
 | `alltrails_list_completed_trails` | A user's completed trails |
-| `alltrails_get_activity_feed` | A user's activity feed (`feed`: `local`/`timeline`/`personal` for the items, omit for the directory; `cursor` paginates; `compact` for slim items) |
+| `alltrails_get_activity_feed` | A user's activity feed (`feed`: `local`/`timeline`/`personal` for the items, omit for the directory; `cursor` paginates) |
 | `alltrails_healthcheck` | Round-trips a probe through the fetchproxy bridge and reports role/port/timing plus a plain-English hint about which hop broke |
 
 The per-user tools default to the signed-in user (resolved via `/api/alltrails/me` or `ALLTRAILS_USER_ID`); pass `userId` to target a public profile.
+
+### Response shape: `view`
+
+`alltrails_search`, `alltrails_get_trail`, `alltrails_get_trail_reviews`,
+`alltrails_get_trail_photos`, `alltrails_get_list_items` and
+`alltrails_get_activity_feed` take a `view` parameter with two rungs:
+
+| `view` | What you get |
+|--------|--------------|
+| `compact` | **The default.** The slim projection described in the table above — the fields a caller acts on. Nothing to pass. |
+| `full` | AllTrails' whole untouched record. |
+
+Compact is the default deliberately. These projections existed before, behind
+`compact: false` and a tool description asking the caller to please opt in — and
+an efficiency that has to be requested is one that usually is not. Ask for
+`view: "full"` when you need a field the projection drops; the commonest is
+route geometry from `alltrails_get_trail`.
+
+> **`view` is not `detail`.** `alltrails_get_trail` also takes `detail`
+> (`basic`/`medium`/`offline`), and that one is a **passthrough to AllTrails** —
+> it decides what the API sends *us*. `view` decides what this server hands
+> *you*. Route geometry needs both: `detail: "offline"` to fetch it and
+> `view: "full"` to keep it. The collision is exactly why the fleet parameter is
+> named `view`.
+>
+> One projection is not a subset: `alltrails_get_trail_photos`' `url` is
+> **derived** by the compact rung (AllTrails' record carries no image URL), so
+> `view: "full"` does not contain it.
 
 ## Troubleshooting
 
