@@ -25,11 +25,18 @@ function clientReturning(value: unknown) {
 }
 
 describe('jsonResponse', () => {
-  it('wraps a payload as a single pretty-printed text block', () => {
+  it('wraps a payload as a single text block with NO formatting whitespace', () => {
     const result = jsonResponse({ foo: 'bar', n: 1 });
     expect(result.content).toHaveLength(1);
     expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('{\n  "foo": "bar",\n  "n": 1\n}');
+    expect(result.content[0].text).toBe('{"foo":"bar","n":1}');
+  });
+
+  it('never touches whitespace inside a value — a review body is content', () => {
+    const comment = 'Great hike.\n\n  Muddy after rain.   ';
+    const text = jsonResponse({ comment }).content[0].text;
+    expect(JSON.parse(text).comment).toBe(comment);
+    expect(text.split('\n')).toHaveLength(1);
   });
 });
 

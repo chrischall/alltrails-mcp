@@ -1,4 +1,4 @@
-import { pruneUndefined, rawTextResult, textResult } from '@chrischall/mcp-utils';
+import { minifiedResult, pruneUndefined, rawTextResult } from '@chrischall/mcp-utils';
 import { decodeHtmlEntities } from '@chrischall/mcp-utils/scrape';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
@@ -8,7 +8,26 @@ import { parseAllTrails } from '../validate.js';
 
 // Pretty-printed JSON tool result. Thin wrapper over @chrischall/mcp-utils'
 // `textResult` so the rest of the codebase keeps the local name.
-export const jsonResponse = textResult;
+export const jsonResponse = minifiedResult;
+
+/**
+ * The rungs this server honours (`@chrischall/mcp-utils`' `view` vocabulary;
+ * `chrischall/workflows` `docs/fleet-conventions.md`, "Response shape").
+ *
+ * The `summarize*` projections below were opt-in — `compact: false`, with the
+ * tool descriptions asking the caller to "Set compact=true (strongly
+ * recommended)". An efficiency that has to be requested is one that usually is
+ * not. `compact` is the default now.
+ *
+ * No `raw`: `full` already returns the untouched upstream payload here, so a
+ * third rung would be a value that silently aliases to another.
+ *
+ * NOTE the name. This server already has a `detail` parameter and it means
+ * something else entirely — it is forwarded to AllTrails as a query param
+ * (basic/medium/offline) and decides what the API sends us. That collision is
+ * exactly why the fleet parameter is `view`.
+ */
+export const ALLTRAILS_VIEWS = ['compact', 'full'] as const;
 
 // Raw-string tool result. Wrapper over @chrischall/mcp-utils' `rawTextResult`.
 export const textResponse = rawTextResult;

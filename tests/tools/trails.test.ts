@@ -33,14 +33,14 @@ describe('alltrails_get_trail', () => {
     expect(client.request).toHaveBeenCalledWith('GET', '/api/alltrails/v3/trails/a%2Fb?detail=offline');
   });
 
-  it('returns the payload as JSON content', async () => {
+  it('returns the untouched payload on view:"full"', async () => {
     const trail = { trails: [{ id: 1, name: 'Trail' }] };
     const { handlers } = setup(trail);
-    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1' });
+    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1', view: 'full' });
     expect(JSON.parse(result.content[0].text)).toEqual(trail);
   });
 
-  it('compact=true unwraps the one-element envelope to a single slim object', async () => {
+  it('projects BY DEFAULT, unwrapping the one-element envelope to a single slim object', async () => {
     const { handlers } = setup({
       trails: [{
         id: 1,
@@ -51,7 +51,9 @@ describe('alltrails_get_trail', () => {
         geoloc: { lat: 1, lng: 2 }, // extra field — dropped by the projection
       }],
     });
-    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1', compact: true });
+    // No argument: the point of the change is that the caller does not have to
+    // know a slim rung exists.
+    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1' });
     expect(JSON.parse(result.content[0].text)).toEqual({
       id: '1',
       name: 'Trail',

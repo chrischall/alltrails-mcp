@@ -1,17 +1,9 @@
+import { resolveView, viewParam } from '@chrischall/mcp-utils';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
 import { OfflineTrailSchema, trailToGpx } from '../gpx.js';
-import {
-  jsonResponse,
-  PhotoListSchema,
-  ReviewListSchema,
-  summarizePhoto,
-  summarizeReview,
-  textResponse,
-  TrailDetailSchema,
-  summarizeTrailDetail,
-} from './_shared.js';
+import { ALLTRAILS_VIEWS, PhotoListSchema, ReviewListSchema, TrailDetailSchema, jsonResponse, summarizePhoto, summarizeReview, summarizeTrailDetail, textResponse } from './_shared.js';
 import { parseAllTrails } from '../validate.js';
 
 // Trail-scoped read tools: detail, reviews, photos, weather. All read-only.
@@ -20,8 +12,8 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
     description:
       'Get details for a single AllTrails trail by its numeric trail id. Returns name, location, ' +
       'length, elevation gain, difficulty, rating, route type, and (at higher detail levels) route geometry. ' +
-      'Set compact=true for a slim projection (name, overview, length in m+mi, elevation gain, difficulty, ' +
-      'rating, route type, location) — recommended unless you need the full record or geometry.',
+      'Returns a slim projection by default (name, overview, length in m+mi, elevation gain, difficulty, ' +
+      'rating, route type, location); pass view:"full" for the whole record and geometry.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       trailId: z.string().describe('Numeric AllTrails trail id (e.g. "10236086")'),
@@ -29,7 +21,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         .enum(['basic', 'medium', 'offline'])
         .describe('Detail level. "medium" (default) is a good overview; "offline" includes full route geometry.')
         .optional(),
-      compact: z.boolean().describe('Return a slim projection instead of the full record (default false)').optional(),
+      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns a slim projection; "full" returns the whole record, route geometry included.' }),
     },
   }, async (args) => {
     const detail = args.detail ?? 'medium';
@@ -37,7 +29,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
       'GET',
       `/api/alltrails/v3/trails/${encodeURIComponent(args.trailId)}?detail=${detail}`,
     );
-    if (args.compact) {
+    if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
       const parsed = parseAllTrails(TrailDetailSchema, raw, 'GET /api/alltrails/v3/trails/{id}');
       if (Array.isArray(parsed.trails)) {
         const trails = parsed.trails.map(summarizeTrailDetail);
@@ -51,13 +43,13 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
 
   server.registerTool('alltrails_get_trail_reviews', {
     description:
-      'Get user reviews for an AllTrails trail by its numeric trail id. Set compact=true to return just ' +
-      '{ user, rating, comment } per review.',
+      'Get user reviews for an AllTrails trail by its numeric trail id. Returns just ' +
+      '{ user, rating, comment } per review by default; pass view:"full" for the whole records.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       trailId: z.string().describe('Numeric AllTrails trail id'),
       limit: z.number().int().positive().describe('Max reviews to return (default 20)').optional(),
-      compact: z.boolean().describe('Return a slim { user, rating, comment } per review (default false)').optional(),
+      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns a slim projection; "full" returns the whole record, route geometry included.' }),
     },
   }, async (args) => {
     const raw = await client.request(
@@ -66,7 +58,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
       { limit: args.limit ?? 20 },
     );
     const parsed = parseAllTrails(ReviewListSchema, raw, 'POST /api/alltrails/v2/trails/{id}/reviews/search');
-    if (args.compact && Array.isArray(parsed.trail_reviews)) {
+    if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact' && Array.isArray(parsed.trail_reviews)) {
       const reviews = parsed.trail_reviews.map(summarizeReview);
       return jsonResponse({ count: reviews.length, reviews });
     }
@@ -75,16 +67,17 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
 
   server.registerTool('alltrails_get_trail_photos', {
     description:
-      'Get photos for an AllTrails trail by its numeric trail id. Set compact=true to return just ' +
-      '{ id, title, likeCount, user, uploadedAt, url } per photo — the url serves the actual image.',
+      'Get photos for an AllTrails trail by its numeric trail id. Returns just ' +
+      '{ id, title, likeCount, user, uploadedAt, url } per photo by default — the url serves the actual image; ' +
+      'pass view:"full" for the whole records.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       trailId: z.string().describe('Numeric AllTrails trail id'),
-      compact: z.boolean().describe('Return a slim projection per photo (default false)').optional(),
+      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns a slim projection; "full" returns the whole record, route geometry included.' }),
     },
   }, async (args) => {
     const raw = await client.request('GET', `/api/alltrails/v2/trails/${encodeURIComponent(args.trailId)}/photos`);
-    if (args.compact) {
+    if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
       const parsed = parseAllTrails(PhotoListSchema, raw, 'GET /api/alltrails/v2/trails/{id}/photos');
       if (Array.isArray(parsed.photos)) {
         // Sign the derived image URLs with the same live-captured key the

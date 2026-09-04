@@ -1,14 +1,9 @@
+import { resolveView, viewParam } from '@chrischall/mcp-utils';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
 import { parseAllTrails } from '../validate.js';
-import {
-  jsonResponse,
-  LocationSuggestSchema,
-  SearchResponseSchema,
-  summarizeLocation,
-  summarizeSearchResult,
-} from './_shared.js';
+import { ALLTRAILS_VIEWS, LocationSuggestSchema, SearchResponseSchema, jsonResponse, summarizeLocation, summarizeSearchResult } from './_shared.js';
 
 // The location record types the geocoder requests (a subset of the suggestions
 // record types — places and points of interest, not trails/guides/lists).
@@ -32,7 +27,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
       '(trail, poi, area, city, …); pass types=["trail"] to narrow. lat/lng are accepted for backward ' +
       'compatibility but verified ignored by the API (2026-07-02) — results carry an implicit ' +
       'account/IP geo bias instead. Without a query this falls back to the legacy explore search, which ' +
-      'returns trails anchored to the signed-in account\'s location. Set compact=true (strongly ' +
+      'returns trails anchored to the signed-in account\'s location. The default view is compact (' +
       'recommended) for slim summaries capped at limit client-side.',
     annotations: { readOnlyHint: true },
     inputSchema: {
@@ -44,10 +39,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
       lat: z.number().describe('Deprecated — the API ignores it (verified 2026-07-02)').optional(),
       lng: z.number().describe('Deprecated — the API ignores it (verified 2026-07-02)').optional(),
       limit: z.number().int().positive().describe('Max results to return (default 20)').optional(),
-      compact: z
-        .boolean()
-        .describe('Return slim per-result summaries capped at limit instead of the full records (default false)')
-        .optional(),
+      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns slim per-result summaries capped at limit; "full" returns AllTrails\' whole records.' }),
     },
   }, async (args) => {
     const limit = args.limit ?? 20;
@@ -72,7 +64,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
       if (args.lng !== undefined) body.lng = args.lng;
       raw = await client.request('POST', '/api/alltrails/explore/v1/search', body);
     }
-    if (args.compact) {
+    if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
       const parsed = parseAllTrails(SearchResponseSchema, raw, ctx);
       if (Array.isArray(parsed.searchResults)) {
         // Truncate locally: suggestions honors the limit, but the legacy

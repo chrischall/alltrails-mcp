@@ -3,7 +3,7 @@
   "version": "2.2.0",
   "license": "MIT",
   "mcpName": "io.github.chrischall/alltrails-mcp",
-  "description": "Unofficial AllTrails MCP server for Claude — developed and maintained by AI (Claude Code)",
+  "description": "Unofficial AllTrails MCP server for Claude \u2014 developed and maintained by AI (Claude Code)",
   "author": "Claude Code (AI) <https://www.anthropic.com/claude>",
   "repository": {
     "type": "git",
@@ -34,7 +34,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@chrischall/mcp-utils": "^0.18.1",
+    "@chrischall/mcp-utils": "^0.21.0",
     "@fetchproxy/server": "^2.2.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.4.2",
