@@ -21,7 +21,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         .enum(['basic', 'medium', 'offline'])
         .describe('Detail level. "medium" (default) is a good overview; "offline" includes full route geometry.')
         .optional(),
-      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns a slim projection; "full" returns the whole record, route geometry included.' }),
+      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns { name, overview, length in m+mi, elevation gain in m+ft, difficulty, rating, route type, location }, unwrapped from the one-element envelope; "full" returns the whole record, route geometry included (which also needs detail:"offline" to be fetched at all).' }),
     },
   }, async (args) => {
     const detail = args.detail ?? 'medium';
@@ -49,7 +49,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
     inputSchema: {
       trailId: z.string().describe('Numeric AllTrails trail id'),
       limit: z.number().int().positive().describe('Max reviews to return (default 20)').optional(),
-      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns a slim projection; "full" returns the whole record, route geometry included.' }),
+      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns { count, reviews: [{ user, rating, comment }] }; "full" returns AllTrails\' whole review records. (No route geometry either way — that is alltrails_get_trail.)' }),
     },
   }, async (args) => {
     const raw = await client.request(
@@ -73,7 +73,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
     annotations: { readOnlyHint: true },
     inputSchema: {
       trailId: z.string().describe('Numeric AllTrails trail id'),
-      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns a slim projection; "full" returns the whole record, route geometry included.' }),
+      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns { count, photos: [{ id, title, likeCount, user, uploadedAt, url }] } — the url is DERIVED and signed here, so "full" (AllTrails\' whole photo records) does not contain it. No route geometry either way — that is alltrails_get_trail.' }),
     },
   }, async (args) => {
     const raw = await client.request('GET', `/api/alltrails/v2/trails/${encodeURIComponent(args.trailId)}/photos`);

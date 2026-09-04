@@ -40,7 +40,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
     annotations: { readOnlyHint: true },
     inputSchema: {
       listId: z.string().describe('Numeric AllTrails list id'),
-      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns slim per-item entries; "full" returns the whole records.' }),
+      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns { count, items: [{ trailId, type, order, notes, addedAt }] } sorted by the curator\'s order; "full" returns AllTrails\' whole list-item records in the order they arrived.' }),
     },
   }, async (args) => {
     const raw = await client.request('GET', `/api/alltrails/lists/${encodeURIComponent(args.listId)}/items`);
@@ -85,7 +85,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         .optional(),
       maxItems: z.number().int().positive().describe('Max items per page (server-side)').optional(),
       cursor: z.string().describe('Opaque nextCursor from a previous page, for pagination').optional(),
-      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns slim per-item entries; "full" returns the whole records.' }),
+      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns { count, hasNextPage, nextCursor, items: [{ type, timestamp, description, user, trail, activity, review }] } — and the no-feed directory as { name, displayName } per feed; "full" returns AllTrails\' whole records.' }),
     },
   }, async (args) => {
     const userId = await resolveUserId(client, args.userId);

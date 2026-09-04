@@ -27,8 +27,9 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
       '(trail, poi, area, city, …); pass types=["trail"] to narrow. lat/lng are accepted for backward ' +
       'compatibility but verified ignored by the API (2026-07-02) — results carry an implicit ' +
       'account/IP geo bias instead. Without a query this falls back to the legacy explore search, which ' +
-      'returns trails anchored to the signed-in account\'s location. The default view is compact (' +
-      'recommended) for slim summaries capped at limit client-side.',
+      'returns trails anchored to the signed-in account\'s location. Results come back as slim ' +
+      'per-result summaries, capped at limit client-side, by default; pass view:"full" for ' +
+      'AllTrails\' whole records.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       query: z.string().describe('Free-text search, e.g. "angels landing" or "waterfall trails"').optional(),
