@@ -63,7 +63,7 @@ describe('alltrails_get_list_items', () => {
     expect(client.request).not.toHaveBeenCalledWith('GET', '/api/alltrails/me');
   });
 
-  it('compact=true returns ordered slim items with paging meta', async () => {
+  it('projects BY DEFAULT to ordered slim items with paging meta', async () => {
     const { handlers } = setup({
       listItems: [
         { trailId: 200, type: 'trail', order: 2, notes: null, metadata: { created: '2020-01-02T00:00:00Z' } },
@@ -72,7 +72,7 @@ describe('alltrails_get_list_items', () => {
       ],
       meta: { items: 3 },
     });
-    const result = await handlers.get('alltrails_get_list_items')!({ listId: '5', compact: true });
+    const result = await handlers.get('alltrails_get_list_items')!({ listId: '5' });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.count).toBe(3);
     // Sorted by the curator's order, order-less items last.
@@ -83,11 +83,11 @@ describe('alltrails_get_list_items', () => {
     ]);
   });
 
-  it('compact=true falls back to raw when the shape drifted', async () => {
+  it('falls back to raw when the shape drifted', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const drifted = { listItems: 'nope' };
     const { handlers } = setup(drifted);
-    const result = await handlers.get('alltrails_get_list_items')!({ listId: '5', compact: true });
+    const result = await handlers.get('alltrails_get_list_items')!({ listId: '5' });
     expect(JSON.parse(result.content[0].text)).toEqual(drifted);
     expect(errSpy).toHaveBeenCalled();
   });
@@ -129,7 +129,7 @@ describe('alltrails_get_activity_feed', () => {
     expect(client.request).toHaveBeenCalledWith('GET', '/api/alltrails/community/blazes/v0/users/12/feeds/timeline');
   });
 
-  it('compact=true projects feed items with paging info', async () => {
+  it('projects feed items with paging info BY DEFAULT', async () => {
     // Shape captured 2026-07-02 from GET .../feeds/local.
     const { handlers } = setup({
       sections: [
@@ -147,7 +147,7 @@ describe('alltrails_get_activity_feed', () => {
       ],
       pageInfo: { hasNextPage: true, itemCount: 1, nextCursor: 'c2' },
     });
-    const result = await handlers.get('alltrails_get_activity_feed')!({ userId: '12', feed: 'local', compact: true });
+    const result = await handlers.get('alltrails_get_activity_feed')!({ userId: '12', feed: 'local' });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.count).toBe(1);
     expect(parsed.hasNextPage).toBe(true);
@@ -160,7 +160,7 @@ describe('alltrails_get_activity_feed', () => {
     });
   });
 
-  it('compact=true projects the feed directory when no feed is selected', async () => {
+  it('projects the feed directory when no feed is selected', async () => {
     const { handlers } = setup({
       feeds: [
         { name: 'local', displayName: 'Local', links: [{ rel: 'start', href: '/x' }] },
@@ -168,7 +168,7 @@ describe('alltrails_get_activity_feed', () => {
       ],
       initialFeedHint: 'local',
     });
-    const result = await handlers.get('alltrails_get_activity_feed')!({ userId: '12', compact: true });
+    const result = await handlers.get('alltrails_get_activity_feed')!({ userId: '12' });
     expect(JSON.parse(result.content[0].text)).toEqual({
       feeds: [
         { name: 'local', displayName: 'Local' },
@@ -178,32 +178,32 @@ describe('alltrails_get_activity_feed', () => {
     });
   });
 
-  it('compact=true tolerates a page with no pageInfo and a directory with bare feeds', async () => {
+  it('tolerates a page with no pageInfo and a directory with bare feeds', async () => {
     const { handlers } = setup({ sections: [] });
-    const page = await handlers.get('alltrails_get_activity_feed')!({ userId: '12', feed: 'personal', compact: true });
+    const page = await handlers.get('alltrails_get_activity_feed')!({ userId: '12', feed: 'personal' });
     expect(JSON.parse(page.content[0].text)).toEqual({ count: 0, items: [] });
   });
 
-  it('compact=true tolerates directory entries with missing fields', async () => {
+  it('tolerates directory entries with missing fields', async () => {
     const { handlers } = setup({ feeds: [{}] });
-    const result = await handlers.get('alltrails_get_activity_feed')!({ userId: '12', compact: true });
+    const result = await handlers.get('alltrails_get_activity_feed')!({ userId: '12' });
     expect(JSON.parse(result.content[0].text)).toEqual({ feeds: [{}] });
   });
 
-  it('compact=true falls back to raw when the feed page shape drifted', async () => {
+  it('falls back to raw when the feed page shape drifted', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const drifted = { sections: 'nope' };
     const { handlers } = setup(drifted);
-    const result = await handlers.get('alltrails_get_activity_feed')!({ userId: '12', feed: 'local', compact: true });
+    const result = await handlers.get('alltrails_get_activity_feed')!({ userId: '12', feed: 'local' });
     expect(JSON.parse(result.content[0].text)).toEqual(drifted);
     expect(errSpy).toHaveBeenCalled();
   });
 
-  it('compact=true falls back to raw when the directory shape drifted', async () => {
+  it('falls back to raw when the directory shape drifted', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const drifted = { feeds: 'nope' };
     const { handlers } = setup(drifted);
-    const result = await handlers.get('alltrails_get_activity_feed')!({ userId: '12', compact: true });
+    const result = await handlers.get('alltrails_get_activity_feed')!({ userId: '12' });
     expect(JSON.parse(result.content[0].text)).toEqual(drifted);
     expect(errSpy).toHaveBeenCalled();
   });

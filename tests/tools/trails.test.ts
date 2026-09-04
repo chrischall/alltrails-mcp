@@ -64,16 +64,16 @@ describe('alltrails_get_trail', () => {
     });
   });
 
-  it('compact=true keeps a multi-element envelope as an array', async () => {
+  it('keeps a multi-element envelope as an array', async () => {
     const { handlers } = setup({ trails: [{ id: 1 }, { id: 2 }] });
-    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1', compact: true });
+    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1' });
     expect(JSON.parse(result.content[0].text)).toEqual([{ id: '1' }, { id: '2' }]);
   });
 
-  it('compact=true falls back to raw when the detail shape drifted (no trails array)', async () => {
+  it('falls back to raw when the detail shape drifted (no trails array)', async () => {
     const raw = { trail: { id: 1 } };
     const { handlers } = setup(raw);
-    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1', compact: true });
+    const result = await handlers.get('alltrails_get_trail')!({ trailId: '1' });
     expect(JSON.parse(result.content[0].text)).toEqual(raw);
   });
 });
@@ -91,24 +91,24 @@ describe('alltrails_get_trail_reviews', () => {
     expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/v2/trails/5/reviews/search', { limit: 3 });
   });
 
-  it('returns a compact projection when compact=true', async () => {
+  it('projects by default', async () => {
     const { handlers } = setup({
       trail_reviews: [
         { user: { name: 'Pat' }, rating: 5, comment: 'Great', extra: 'dropped' },
         { rating: 3 },
       ],
     });
-    const result = await handlers.get('alltrails_get_trail_reviews')!({ trailId: '5', compact: true });
+    const result = await handlers.get('alltrails_get_trail_reviews')!({ trailId: '5' });
     expect(JSON.parse(result.content[0].text)).toEqual({
       count: 2,
       reviews: [{ user: 'Pat', rating: 5, comment: 'Great' }, { rating: 3 }],
     });
   });
 
-  it('falls back to raw when compact=true but the reviews shape drifted', async () => {
+  it('falls back to raw when the reviews shape drifted', async () => {
     const raw = { data: [] }; // no trail_reviews array
     const { handlers } = setup(raw);
-    const result = await handlers.get('alltrails_get_trail_reviews')!({ trailId: '5', compact: true });
+    const result = await handlers.get('alltrails_get_trail_reviews')!({ trailId: '5' });
     expect(JSON.parse(result.content[0].text)).toEqual(raw);
   });
 });
@@ -120,7 +120,7 @@ describe('alltrails_get_trail_photos', () => {
     expect(client.request).toHaveBeenCalledWith('GET', '/api/alltrails/v2/trails/7/photos');
   });
 
-  it('returns a compact projection when compact=true, signing image urls with the captured key', async () => {
+  it('projects by default, signing image urls with the captured key', async () => {
     const { client, handlers } = setup({
       photos: [
         { id: 1, title: 'View', likeCount: 2, user: { firstName: 'A', lastName: 'B' } },
@@ -128,7 +128,7 @@ describe('alltrails_get_trail_photos', () => {
       ],
     });
     vi.spyOn(client, 'currentApiKey').mockReturnValue('live-captured-key');
-    const result = await handlers.get('alltrails_get_trail_photos')!({ trailId: '7', compact: true });
+    const result = await handlers.get('alltrails_get_trail_photos')!({ trailId: '7' });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.count).toBe(2);
     expect(parsed.photos[0].title).toBe('View');
@@ -141,7 +141,7 @@ describe('alltrails_get_trail_photos', () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const drifted = { photos: 'nope' };
     const { handlers } = setup(drifted);
-    const result = await handlers.get('alltrails_get_trail_photos')!({ trailId: '7', compact: true });
+    const result = await handlers.get('alltrails_get_trail_photos')!({ trailId: '7' });
     expect(JSON.parse(result.content[0].text)).toEqual(drifted);
     expect(errSpy).toHaveBeenCalled();
   });
