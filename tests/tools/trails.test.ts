@@ -137,7 +137,7 @@ describe('alltrails_get_trail_photos', () => {
     expect(parsed.photos[1]).toEqual({ id: '2', url: expect.stringContaining('/photos/2/image') });
   });
 
-  it('falls back to raw when compact=true but the photos shape drifted', async () => {
+  it('falls back to raw when the photos shape drifted', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const drifted = { photos: 'nope' };
     const { handlers } = setup(drifted);
