@@ -14,7 +14,7 @@ import { registerHealthcheckTools } from './tools/healthcheck.js';
 // always succeeds before any credential check runs.
 await runMcp({
   name: 'alltrails',
-  version: '2.2.0', // x-release-please-version
+  version: '2.3.0', // x-release-please-version
   deps: client,
   tools: [registerTrailTools, registerExploreTools, registerUserTools, registerHealthcheckTools],
   banner:

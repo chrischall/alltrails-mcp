@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.3.0](https://github.com/chrischall/alltrails-mcp/compare/v2.2.0...v2.3.0) (2026-09-04)
+
+
+### Features
+
+* **tools:** compact by default, on the fleet `view` vocabulary ([#91](https://github.com/chrischall/alltrails-mcp/issues/91)) ([bc23525](https://github.com/chrischall/alltrails-mcp/commit/bc23525dd8cab1de6dbe1a481146d9dce494b144))
+
+
+### Documentation
+
+* **mint:** correct what ALLTRAILS_DEBUG_LOG actually logs ([#83](https://github.com/chrischall/alltrails-mcp/issues/83)) ([72db4fd](https://github.com/chrischall/alltrails-mcp/commit/72db4fd2bb601e7bd40e5d52bfb9b023a3b7212f)), closes [#81](https://github.com/chrischall/alltrails-mcp/issues/81)
+* **mint:** declare ALLTRAILS_DEBUG_LOG in mint.yaml ([#80](https://github.com/chrischall/alltrails-mcp/issues/80)) ([d769cf6](https://github.com/chrischall/alltrails-mcp/commit/d769cf6e723e572298979178c3f178c6f057ae84))
+
 ## [2.2.0](https://github.com/chrischall/alltrails-mcp/compare/v2.1.5...v2.2.0) (2026-08-29)
 
 
