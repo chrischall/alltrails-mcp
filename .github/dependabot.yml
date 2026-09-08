@@ -6,9 +6,21 @@ updates:
       interval: weekly
     open-pull-requests-limit: 10
     groups:
+      # Dependabot scores group patterns by specificity and hands a dependency
+      # to the HIGHEST-scoring group that matches, not the first one listed.
+      # A wildcard like "@vitest/*" scores 94 (100 - 10 per wildcard + a length
+      # bonus); a group with no `patterns` at all — dev-dependencies below —
+      # scores 500 and wins. So "@vitest/*" alone loses @vitest/coverage-v8 to
+      # dev-dependencies, which on a MAJOR bump cannot take it either
+      # (minor/patch only), leaving it ungrouped in its own PR. vitest and its
+      # coverage provider peer-depend on each other at an exact version, so the
+      # two halves apart make the peer set unsatisfiable and `npm ci` fails
+      # ERESOLVE, red forever. Listing the exact name scores 1000 and pins it
+      # here. See dependabot-core PatternSpecificityCalculator.
       vitest:
         patterns:
           - "vitest"
+          - "@vitest/coverage-v8"
           - "@vitest/*"
         update-types:
           - major
