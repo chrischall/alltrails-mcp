@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/chrischall/alltrails-mcp/compare/v2.3.0...v2.3.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* **deps:** require @fetchproxy/server ^2.7.0, the first that reads FETCHPROXY_IDENTITY_DIR ([#99](https://github.com/chrischall/alltrails-mcp/issues/99)) ([2a75521](https://github.com/chrischall/alltrails-mcp/commit/2a75521dc6cfb7f85a0a14c0d6006b158224612b))
+
 ## [2.3.0](https://github.com/chrischall/alltrails-mcp/compare/v2.2.0...v2.3.0) (2026-09-04)
 
 
