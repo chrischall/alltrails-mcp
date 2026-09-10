@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.3.2](https://github.com/chrischall/alltrails-mcp/compare/v2.3.1...v2.3.2) (2026-09-10)
+
+
+### Bug Fixes
+
+* **deps:** @fetchproxy/server 2.10.0 and @chrischall/mcp-utils 0.26.1 ([#103](https://github.com/chrischall/alltrails-mcp/issues/103)) ([fafaeb8](https://github.com/chrischall/alltrails-mcp/commit/fafaeb8c48eaabef43b32022e8931c8151d16815))
+* **deps:** declare the peer floors mcp-utils 0.26.1 requires ([#104](https://github.com/chrischall/alltrails-mcp/issues/104)) ([5e70077](https://github.com/chrischall/alltrails-mcp/commit/5e700774b54c2608399a817b948148891fb39785))
+* **deps:** take @fetchproxy/server 2.9.1 so a pairing prompt survives ([#101](https://github.com/chrischall/alltrails-mcp/issues/101)) ([94f2eaf](https://github.com/chrischall/alltrails-mcp/commit/94f2eaf31039fd22d85b61f6a15c0a032247a0c1))
+
 ## [2.3.1](https://github.com/chrischall/alltrails-mcp/compare/v2.3.0...v2.3.1) (2026-09-09)
 
 
