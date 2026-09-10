@@ -110,7 +110,17 @@ describe('AllTrailsClient — x-at-key live capture', () => {
     await expect(client.request('GET', '/api/alltrails/x')).rejects.toThrow(/AllTrails API error: 401/);
   });
 
-  it('wraps a capture failure with an actionable open-a-tab hint', async () => {
+  /**
+   * The hint has to say WHEN to reload, not just to reload (#105).
+   *
+   * The extension adds its `onBeforeSendHeaders` listener when the capture call
+   * arrives and drops it the moment that call resolves or times out, so the
+   * window is the CALL, not the session. The old wording — "open or refresh a
+   * signed-in page and retry" — put the reload first, which is when nothing is
+   * listening, so following it in the order written reproduced the failure it
+   * was meant to fix.
+   */
+  it('tells the user to reload DURING the call, not before it', async () => {
     const { transport } = stubTransport(
       [],
       [new Error('fetchproxy: https://www.alltrails.com/api/alltrails/* did not respond within 30000ms')],
@@ -118,7 +128,11 @@ describe('AllTrailsClient — x-at-key live capture', () => {
     const client = new AllTrailsClient({ transport });
     const err = await client.request('GET', '/api/alltrails/x').catch((e) => e as Error);
     expect(err.message).toContain('did not respond within 30000ms');
-    expect(err.message).toContain('open or refresh a signed-in www.alltrails.com page');
+    // The property, not the sentence: it must place the reload inside the call
+    // and must not tell anyone to refresh first.
+    expect(err.message).toMatch(/while it is running|WHILE this call waits/);
+    expect(err.message).toMatch(/refreshing beforehand does not help/);
+    expect(err.message).not.toMatch(/refresh[^.]*and retry/i);
   });
 
   it('currentApiKey() is undefined before the first capture', () => {

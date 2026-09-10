@@ -120,20 +120,33 @@ export class AllTrailsClient {
   // of our own in-flight requests and hand back the key we're replacing.
   private async captureApiKey(invalidKey?: string): Promise<string> {
     const transport = await this.bridgeReady();
+    // Printed BEFORE the wait starts, which is the only moment this advice is
+    // actionable — see the throw below for why.
     console.error(
-      '[alltrails-mcp] Capturing the x-at-key app key from the browser — open or refresh a signed-in ' +
-        'www.alltrails.com page if this stalls.',
+      '[alltrails-mcp] Capturing the x-at-key app key from the browser — reload a signed-in ' +
+        'www.alltrails.com tab NOW, while this is waiting. The key is read off a request the page ' +
+        'makes during the wait; a tab that is already loaded and idle will not produce one.',
     );
     for (let attempt = 0; attempt < 3; attempt++) {
       let captured: string;
       try {
         captured = await transport.server.captureRequestHeader({ ...KEY_CAPTURE });
       } catch (e) {
-        // The capture only fires when the tab itself makes an API request —
-        // an idle tab times out. Say what to do, not just what failed.
+        // The capture only fires when the tab itself makes an API request — an
+        // idle tab times out. Say what to do, not just what failed.
+        //
+        // ORDER MATTERS, and the old wording had it backwards ("refresh … and
+        // retry"). The extension adds its `onBeforeSendHeaders` listener when
+        // the capture call ARRIVES and removes it the moment that call
+        // resolves or times out, so the window is the CALL, not the session. A
+        // refresh that finished before the next attempt began happened while
+        // nothing was listening, and its key is gone — so following the old
+        // advice in the order it was written reproduced the failure it was
+        // meant to fix.
         throw new Error(
-          `AllTrails: capturing the x-at-key app key failed (${messageOf(e)}). The capture only sees ` +
-            'requests the tab itself makes — open or refresh a signed-in www.alltrails.com page and retry.',
+          `AllTrails: capturing the x-at-key app key failed (${messageOf(e)}). The key is read off a ` +
+            'request the page makes WHILE this call waits, so refreshing beforehand does not help. ' +
+            'Run this again and reload a signed-in www.alltrails.com tab while it is running.',
         );
       }
       if (captured !== invalidKey) {

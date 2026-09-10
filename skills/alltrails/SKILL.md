@@ -96,5 +96,5 @@ Full route geometry needs **both**: `detail: "offline"` to fetch it and
 
 - All tools are **read-only** — this server never writes to AllTrails.
 - Compact summaries include both metric and imperial fields (`lengthMeters`/`lengthMiles`, `elevationGainMeters`/`elevationGainFeet`) — no unit conversion needed.
-- A `403` usually means the tab isn't signed in — sign into alltrails.com in an open tab and retry. An "AllTrails bridge:" error means the bridge itself failed — run `alltrails_healthcheck`. A key-capture stall means the tab is idle — open or refresh a www.alltrails.com page.
+- A `403` usually means the tab isn't signed in — sign into alltrails.com in an open tab and retry. An "AllTrails bridge:" error means the bridge itself failed — run `alltrails_healthcheck`. A key-capture stall means the tab is idle — re-run the tool and reload a www.alltrails.com tab **while it is running**, since the key is read off a request made during the call and refreshing beforehand is not seen.
 - Trail/user ids are numeric strings as they appear in AllTrails URLs.

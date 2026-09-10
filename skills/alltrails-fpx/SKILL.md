@@ -51,12 +51,17 @@ returns everything declared, including `capturedHeaders`:
 AT_KEY=$(fpx session -p alltrails | jq -r '.capturedHeaders["x-at-key"] // empty')
 ```
 
-If `AT_KEY` comes back empty, the tab hasn't made an `/api/alltrails/*`
-request recently — feed it one and retry:
+If `AT_KEY` comes back empty, the tab made no `/api/alltrails/*` request
+**during the capture window**. The extension listens only while the capture
+call is in flight, so loading a page first and running `fpx session` afterwards
+is a race you usually lose — the requests fire before anything is listening.
+
+Start the capture first, then feed the tab:
 
 ```sh
-open 'https://www.alltrails.com/explore'   # or refresh the open tab
-AT_KEY=$(fpx session -p alltrails | jq -r '.capturedHeaders["x-at-key"] // empty')
+fpx session -p alltrails > /tmp/at.json &   # opens the capture window
+sleep 1 && open 'https://www.alltrails.com/explore'   # or reload the open tab
+wait && AT_KEY=$(jq -r '.capturedHeaders["x-at-key"] // empty' /tmp/at.json)
 ```
 
 Attach it (plus the other two protocol headers — defaults match the MCP's
@@ -94,8 +99,10 @@ in the path.
   from `fpx` is almost always a DataDome challenge page, not real data).
 - `2` — bridge unavailable: extension not connected or pairing pending →
   `fpx pair -p alltrails`, confirm an alltrails.com tab is open.
-- `3` — bot wall: the tab hasn't cleared DataDome → open/refresh a
-  `www.alltrails.com` tab and retry.
+- `3` — bot wall: the tab hasn't cleared DataDome → open a
+  `www.alltrails.com` tab, clear the challenge, then retry. (Unlike a capture
+  stall, this one really is "fix the tab first" — the wall is a state the tab
+  is in, not an event the call has to witness.)
 - `4` — upstream non-2xx from AllTrails (400/401 usually means a missing or
   stale `x-at-key` — re-capture and retry).
 
