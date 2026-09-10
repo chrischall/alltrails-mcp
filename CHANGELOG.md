@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.3](https://github.com/chrischall/alltrails-mcp/compare/v2.3.2...v2.3.3) (2026-09-10)
+
+
+### Bug Fixes
+
+* tell the user to reload during the key capture, not before it ([#106](https://github.com/chrischall/alltrails-mcp/issues/106)) ([88d5427](https://github.com/chrischall/alltrails-mcp/commit/88d54272ee4afd4f253f59559139a2b5b7ff00a0)), closes [#105](https://github.com/chrischall/alltrails-mcp/issues/105)
+
 ## [2.3.2](https://github.com/chrischall/alltrails-mcp/compare/v2.3.1...v2.3.2) (2026-09-10)
 
 
