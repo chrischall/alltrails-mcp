@@ -157,7 +157,7 @@ route geometry from `alltrails_get_trail`.
 
 **"AllTrails bridge: …"** — the bridge itself failed before reaching AllTrails (extension not running, pairing not approved, no tab). Run `alltrails_healthcheck` for a diagnosis, and check the Transporter extension popup.
 
-**"AllTrails: capturing the x-at-key app key failed…"** — the key capture only sees requests your tab itself makes, and an idle tab makes none. Open or refresh a signed-in www.alltrails.com page and retry.
+**"AllTrails: capturing the x-at-key app key failed…"** — the key is read off a request your tab makes **while the call is waiting**, and an idle tab makes none. Refreshing first does not help: the extension only listens for the duration of the call, so a reload that finished before it started happened while nothing was listening. Run the tool again and reload a signed-in www.alltrails.com tab while it is running.
 
 **Empty / unexpected results** — the internal AllTrails endpoints are undocumented and change over time; responses may shift. Enable `ALLTRAILS_DEBUG_LOG=1` to inspect the raw traffic on stderr.
 
