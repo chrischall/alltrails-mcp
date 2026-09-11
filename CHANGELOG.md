@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.4](https://github.com/chrischall/alltrails-mcp/compare/v2.3.3...v2.3.4) (2026-09-11)
+
+
+### Bug Fixes
+
+* **deps:** @fetchproxy/server 2.11.3, so the hosted extension pin persists ([#108](https://github.com/chrischall/alltrails-mcp/issues/108)) ([5e0eeb8](https://github.com/chrischall/alltrails-mcp/commit/5e0eeb84ad48c2ed8876dc52a729544f4de22d6b))
+
 ## [2.3.3](https://github.com/chrischall/alltrails-mcp/compare/v2.3.2...v2.3.3) (2026-09-10)
 
 
