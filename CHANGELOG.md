@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.4](https://github.com/chrischall/alltrails-mcp/compare/v2.3.3...v2.3.4) (2026-09-14)
+
+
+### Bug Fixes
+
+* **deps:** @fetchproxy/server 2.11.3, so the hosted extension pin persists ([#108](https://github.com/chrischall/alltrails-mcp/issues/108)) ([5e0eeb8](https://github.com/chrischall/alltrails-mcp/commit/5e0eeb84ad48c2ed8876dc52a729544f4de22d6b))
+* **deps:** @fetchproxy/server 3.0.0 — protocol v4 (forward secrecy, AAD over the frame) ([#110](https://github.com/chrischall/alltrails-mcp/issues/110)) ([7431ed7](https://github.com/chrischall/alltrails-mcp/commit/7431ed7cc46b13abe984204dec4418b9478506f5))
+
 ## [2.3.3](https://github.com/chrischall/alltrails-mcp/compare/v2.3.2...v2.3.3) (2026-09-10)
 
 
