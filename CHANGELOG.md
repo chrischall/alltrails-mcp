@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.5](https://github.com/chrischall/alltrails-mcp/compare/v2.3.4...v2.3.5) (2026-09-15)
+
+
+### Bug Fixes
+
+* **deps:** @fetchproxy/server 3.0.1 — capped peer frames, logged load drops, atomic identity writes ([#111](https://github.com/chrischall/alltrails-mcp/issues/111)) ([65e6940](https://github.com/chrischall/alltrails-mcp/commit/65e69407a89dbc9bac55eb2f85d9e6ddd629ed2f))
+
 ## [2.3.4](https://github.com/chrischall/alltrails-mcp/compare/v2.3.3...v2.3.4) (2026-09-14)
 
 
