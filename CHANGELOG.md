@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.0.0](https://github.com/chrischall/alltrails-mcp/compare/v2.3.5...v3.0.0) (2026-09-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **mcp:** migrate server to SDK v2 ([#117](https://github.com/chrischall/alltrails-mcp/issues/117))
+
+### Features
+
+* **mcp:** migrate server to SDK v2 ([#117](https://github.com/chrischall/alltrails-mcp/issues/117)) ([14b4f6b](https://github.com/chrischall/alltrails-mcp/commit/14b4f6bc7152f718ec04c366c58f885c160f9db7))
+
+
+### Bug Fixes
+
+* **build:** preserve Zod initialization in standalone bundle ([#119](https://github.com/chrischall/alltrails-mcp/issues/119)) ([718a110](https://github.com/chrischall/alltrails-mcp/commit/718a11029d25e961fd05bde59162173556e0ede4))
+* **deps:** Bump the production-dependencies group with 2 updates ([#115](https://github.com/chrischall/alltrails-mcp/issues/115)) ([7cc7620](https://github.com/chrischall/alltrails-mcp/commit/7cc7620e9635af815ddf96628785e62d658531c9))
+* **mcp:** restore tool indentation ([#120](https://github.com/chrischall/alltrails-mcp/issues/120)) ([8865986](https://github.com/chrischall/alltrails-mcp/commit/8865986fe0a4a317887eb21b50ec7160c4c3597c))
+
 ## [2.3.5](https://github.com/chrischall/alltrails-mcp/compare/v2.3.4...v2.3.5) (2026-09-15)
 
 
