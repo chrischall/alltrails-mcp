@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { BridgeProbeResult, FetchproxyTransport } from '@chrischall/mcp-utils/fetchproxy';
 import { AllTrailsClient } from '../../src/client.js';
 import { registerHealthcheckTools, HEALTHCHECK_PROBE_PATH } from '../../src/tools/healthcheck.js';
