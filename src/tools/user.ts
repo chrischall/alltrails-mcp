@@ -1,5 +1,5 @@
 import { resolveView, viewParam } from '@chrischall/mcp-utils';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
 import { parseAllTrails } from '../validate.js';
@@ -22,9 +22,9 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
       'List an AllTrails user\'s saved lists (favorites, custom lists). Defaults to the signed-in user; ' +
       'pass a userId to target a specific public profile.',
     annotations: { readOnlyHint: true },
-    inputSchema: {
-      userId: z.string().describe('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
-    },
+    inputSchema: z.object({
+    userId: z.string().describe('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
+  }),
   }, async (args) => {
     const userId = await resolveUserId(client, args.userId);
     const data = await client.request('GET', `/api/alltrails/users/${encodeURIComponent(userId)}/lists`);
@@ -33,37 +33,37 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
 
   server.registerTool('alltrails_get_list_items', {
     description:
-      'Get the trails saved in an AllTrails list by its numeric list id (from alltrails_list_user_lists, ' +
-      'or a public "list" record from alltrails_search). Items are sparse references: each carries a ' +
-      'trailId (hydrate with alltrails_get_trail), the curator\'s order, and any notes — not trail ' +
-      'details. Returns slim { trailId, type, order, notes, addedAt } entries sorted by order by default; pass view:"full" for the whole records.',
+'Get the trails saved in an AllTrails list by its numeric list id (from alltrails_list_user_lists, ' +
+'or a public "list" record from alltrails_search). Items are sparse references: each carries a ' +
+'trailId (hydrate with alltrails_get_trail), the curator\'s order, and any notes — not trail ' +
+'details. Returns slim { trailId, type, order, notes, addedAt } entries sorted by order by default; pass view:"full" for the whole records.',
     annotations: { readOnlyHint: true },
-    inputSchema: {
-      listId: z.string().describe('Numeric AllTrails list id'),
-      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns { count, items: [{ trailId, type, order, notes, addedAt }] } sorted by the curator\'s order; "full" returns AllTrails\' whole list-item records in the order they arrived.' }),
-    },
+    inputSchema: z.object({
+    listId: z.string().describe('Numeric AllTrails list id'),
+    view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns { count, items: [{ trailId, type, order, notes, addedAt }] } sorted by the curator\'s order; "full" returns AllTrails\' whole list-item records in the order they arrived.' }),
+  }),
   }, async (args) => {
     const raw = await client.request('GET', `/api/alltrails/lists/${encodeURIComponent(args.listId)}/items`);
     if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
-      const parsed = parseAllTrails(ListItemsSchema, raw, 'GET /api/alltrails/lists/{id}/items');
-      if (Array.isArray(parsed.listItems)) {
-        const items = parsed.listItems
-          .map(summarizeListItem)
-          .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
-        return jsonResponse({ count: items.length, items });
-      }
+const parsed = parseAllTrails(ListItemsSchema, raw, 'GET /api/alltrails/lists/{id}/items');
+if (Array.isArray(parsed.listItems)) {
+  const items = parsed.listItems
+    .map(summarizeListItem)
+    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+  return jsonResponse({ count: items.length, items });
+}
     }
     return jsonResponse(raw);
   });
 
   server.registerTool('alltrails_list_completed_trails', {
     description:
-      'List the trails an AllTrails user has marked completed. Defaults to the signed-in user; pass a userId ' +
-      'to target a specific public profile.',
+'List the trails an AllTrails user has marked completed. Defaults to the signed-in user; pass a userId ' +
+'to target a specific public profile.',
     annotations: { readOnlyHint: true },
-    inputSchema: {
-      userId: z.string().describe('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
-    },
+    inputSchema: z.object({
+    userId: z.string().describe('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
+  }),
   }, async (args) => {
     const userId = await resolveUserId(client, args.userId);
     const data = await client.request('GET', `/api/alltrails/users/${encodeURIComponent(userId)}/trails/completed`);
@@ -72,36 +72,36 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
 
   server.registerTool('alltrails_get_activity_feed', {
     description:
-      'Get an AllTrails user\'s activity feed (recorded hikes and posts). Defaults to the signed-in user; ' +
-      'pass a userId to target a specific public profile. Without a feed argument this returns the feed ' +
-      'DIRECTORY (the available feeds: local, timeline (following), personal (own posts)) — pass feed to ' +
-      'get the actual items. Returns slim projections by default; pass view:"full" for the whole records.',
+'Get an AllTrails user\'s activity feed (recorded hikes and posts). Defaults to the signed-in user; ' +
+'pass a userId to target a specific public profile. Without a feed argument this returns the feed ' +
+'DIRECTORY (the available feeds: local, timeline (following), personal (own posts)) — pass feed to ' +
+'get the actual items. Returns slim projections by default; pass view:"full" for the whole records.',
     annotations: { readOnlyHint: true },
-    inputSchema: {
-      userId: z.string().describe('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
-      feed: z
-        .enum(['local', 'timeline', 'personal'])
-        .describe('Which feed to read: local (nearby activity), timeline (people you follow), personal (own posts). Omit to list the available feeds.')
-        .optional(),
-      maxItems: z.number().int().positive().describe('Max items per page (server-side)').optional(),
-      cursor: z.string().describe('Opaque nextCursor from a previous page, for pagination').optional(),
-      view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns { count, hasNextPage, nextCursor, items: [{ type, timestamp, description, user, trail, activity, review }] } — and the no-feed directory as { name, displayName } per feed; "full" returns AllTrails\' whole records.' }),
-    },
+    inputSchema: z.object({
+    userId: z.string().describe('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
+    feed: z
+      .enum(['local', 'timeline', 'personal'])
+      .describe('Which feed to read: local (nearby activity), timeline (people you follow), personal (own posts). Omit to list the available feeds.')
+      .optional(),
+    maxItems: z.number().int().positive().describe('Max items per page (server-side)').optional(),
+    cursor: z.string().describe('Opaque nextCursor from a previous page, for pagination').optional(),
+    view: viewParam(ALLTRAILS_VIEWS, { note: 'compact returns { count, hasNextPage, nextCursor, items: [{ type, timestamp, description, user, trail, activity, review }] } — and the no-feed directory as { name, displayName } per feed; "full" returns AllTrails\' whole records.' }),
+  }),
   }, async (args) => {
     const userId = await resolveUserId(client, args.userId);
     const base = `/api/alltrails/community/blazes/v0/users/${encodeURIComponent(userId)}/feeds`;
     if (!args.feed) {
-      const raw = await client.request('GET', base);
-      if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
-        const parsed = parseAllTrails(FeedDirectorySchema, raw, 'GET .../feeds');
-        if (Array.isArray(parsed.feeds)) {
-          return jsonResponse({
-            feeds: parsed.feeds.map((f) => ({ name: f.name ?? undefined, displayName: f.displayName ?? undefined })),
-            initialFeedHint: parsed.initialFeedHint ?? undefined,
-          });
-        }
-      }
-      return jsonResponse(raw);
+const raw = await client.request('GET', base);
+if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
+  const parsed = parseAllTrails(FeedDirectorySchema, raw, 'GET .../feeds');
+  if (Array.isArray(parsed.feeds)) {
+    return jsonResponse({
+      feeds: parsed.feeds.map((f) => ({ name: f.name ?? undefined, displayName: f.displayName ?? undefined })),
+      initialFeedHint: parsed.initialFeedHint ?? undefined,
+    });
+  }
+}
+return jsonResponse(raw);
     }
     const params = new URLSearchParams();
     if (args.maxItems !== undefined) params.set('maxItems', String(args.maxItems));
@@ -109,18 +109,18 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
     const qs = params.size > 0 ? `?${params.toString()}` : '';
     const raw = await client.request('GET', `${base}/${args.feed}${qs}`);
     if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
-      const parsed = parseAllTrails(FeedPageSchema, raw, 'GET .../feeds/{feed}');
-      if (Array.isArray(parsed.sections)) {
-        const items = parsed.sections
-          .filter((s) => s.itemData !== undefined && s.itemData !== null)
-          .map((s) => summarizeFeedItem(s.itemData!));
-        return jsonResponse({
-          count: items.length,
-          hasNextPage: parsed.pageInfo?.hasNextPage ?? undefined,
-          nextCursor: parsed.pageInfo?.nextCursor ?? undefined,
-          items,
-        });
-      }
+const parsed = parseAllTrails(FeedPageSchema, raw, 'GET .../feeds/{feed}');
+if (Array.isArray(parsed.sections)) {
+  const items = parsed.sections
+    .filter((s) => s.itemData !== undefined && s.itemData !== null)
+    .map((s) => summarizeFeedItem(s.itemData!));
+  return jsonResponse({
+    count: items.length,
+    hasNextPage: parsed.pageInfo?.hasNextPage ?? undefined,
+    nextCursor: parsed.pageInfo?.nextCursor ?? undefined,
+    items,
+  });
+}
     }
     return jsonResponse(raw);
   });

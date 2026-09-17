@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { AllTrailsClient } from '../../src/client.js';
 import { registerTrailTools } from '../../src/tools/trails.js';
 import { registerExploreTools } from '../../src/tools/explore.js';
