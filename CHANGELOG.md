@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.0](https://github.com/chrischall/alltrails-mcp/compare/v3.0.0...v3.1.0) (2026-09-19)
+
+
+### Features
+
+* **deps:** take mcp-utils 1.0.0, so this server negotiates the 2026 era ([#121](https://github.com/chrischall/alltrails-mcp/issues/121)) ([2209d4b](https://github.com/chrischall/alltrails-mcp/commit/2209d4bc03f8b0382e0b1b9a3fd55c83b0626b5f))
+
 ## [3.0.0](https://github.com/chrischall/alltrails-mcp/compare/v2.3.5...v3.0.0) (2026-09-17)
 
 
