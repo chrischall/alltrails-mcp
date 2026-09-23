@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.2](https://github.com/chrischall/alltrails-mcp/compare/v3.1.1...v3.1.2) (2026-09-23)
+
+
+### Bug Fixes
+
+* **client:** stop stalling bad-input 400s on a full x-at-key re-capture ([#130](https://github.com/chrischall/alltrails-mcp/issues/130)) ([561b1f8](https://github.com/chrischall/alltrails-mcp/commit/561b1f83db7bc913638a6ac7e05b80b96383c3d9))
+* **deps:** Bump dotenv from 17.4.2 to 18.0.1 ([#128](https://github.com/chrischall/alltrails-mcp/issues/128)) ([193b689](https://github.com/chrischall/alltrails-mcp/commit/193b689b80664c3ecaa3e70c23a1594bbce7d462))
+
 ## [3.1.1](https://github.com/chrischall/alltrails-mcp/compare/v3.1.0...v3.1.1) (2026-09-23)
 
 
