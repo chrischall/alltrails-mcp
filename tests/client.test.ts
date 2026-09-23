@@ -104,6 +104,51 @@ describe('AllTrailsClient — x-at-key live capture', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('does not stall a plain bad-input 400: one short, silent re-capture probe, then the original error (fleet-audit#41)', async () => {
+    const { transport, captureRequestHeader } = stubTransport(
+      [{ status: 200, body: '{}' }, { status: 400, body: '{"errors":["bad id"]}' }],
+      // First capture: the key. The probe times out (an idle tab) — it must
+      // be bounded, attempted once, and must not print the "reload NOW" advice.
+      [CAPTURED_KEY, new Error('capture timed out')],
+    );
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const client = new AllTrailsClient({ transport });
+    await client.request('GET', '/api/alltrails/warmup');
+    errSpy.mockClear();
+    await expect(client.request('GET', '/api/alltrails/trails/angels-landing/reviews')).rejects.toThrow(
+      /AllTrails API error: 400/,
+    );
+    // warm-up capture + exactly ONE probe
+    expect(captureRequestHeader).toHaveBeenCalledTimes(2);
+    const probeOpts = captureRequestHeader.mock.calls[1][0] as { timeoutMs?: number };
+    expect(probeOpts.timeoutMs).toBeGreaterThan(0);
+    expect(probeOpts.timeoutMs).toBeLessThanOrEqual(5000);
+    expect(errSpy.mock.calls.flat().join('\n')).not.toMatch(/reload a signed-in/);
+  });
+
+  it('still replays a 400 once when the short probe finds a rotated key', async () => {
+    const { transport, fetch, captureRequestHeader } = stubTransport(
+      [{ status: 400 }, { status: 200, body: '{"ok":true}' }],
+      ['stale-key', 'rotated-key'],
+    );
+    const client = new AllTrailsClient({ transport });
+    await expect(client.request('GET', '/api/alltrails/x')).resolves.toEqual({ ok: true });
+    expect(captureRequestHeader).toHaveBeenCalledTimes(2);
+    const retryInit = fetch.mock.calls[1][0] as { headers: Record<string, string> };
+    expect(retryInit.headers['x-at-key']).toBe('rotated-key');
+  });
+
+  it('a 401 keeps the full rotation re-capture (no short timeout)', async () => {
+    const { transport, captureRequestHeader } = stubTransport(
+      [{ status: 401 }, { status: 200, body: '{}' }],
+      ['stale-key', 'rotated-key'],
+    );
+    const client = new AllTrailsClient({ transport });
+    await client.request('GET', '/api/alltrails/x');
+    const opts = captureRequestHeader.mock.calls[1][0] as { timeoutMs?: number };
+    expect(opts.timeoutMs).toBeUndefined();
+  });
+
   it('keeps the original error when the rotation re-capture itself fails', async () => {
     const { transport } = stubTransport([{ status: 401 }], ['first-key', new Error('capture timed out')]);
     const client = new AllTrailsClient({ transport });

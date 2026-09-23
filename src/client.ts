@@ -12,10 +12,11 @@
 //
 // THE x-at-key APP KEY is never stored in code or config: it is captured live
 // from the tab's own API traffic (captureRequestHeader) on first need, held in
-// process memory only, and reused for the life of the process. On a 400/401
-// (the rotation signature) the client re-captures — discarding values equal to
-// the stale key so it can't recapture its own in-flight requests — and replays
-// once.
+// process memory only, and reused for the life of the process. On a 401 (the
+// rotation signature) the client re-captures — discarding values equal to the
+// stale key so it can't recapture its own in-flight requests — and replays
+// once. A 400 is usually just bad input, so it only earns a single short,
+// silent probe (see ROTATION_PROBE_TIMEOUT_MS) rather than the full capture.
 
 import { loadDotenvSafely, messageOf } from '@chrischall/mcp-utils';
 import { bridgeErrorInfo, type FetchproxyTransport } from '@chrischall/mcp-utils/fetchproxy';
@@ -59,6 +60,24 @@ function protocolHeaders(apiKey: string, hasBody: boolean): Record<string, strin
 
 /** Where the app key is captured from: the tab's own API requests. */
 const KEY_CAPTURE = { host: 'www.alltrails.com', path: '/api/alltrails/*', headerName: 'x-at-key' } as const;
+
+/**
+ * How long a 400 may wait for a rotated key. AllTrails answers 400 for a
+ * missing/stale x-at-key but ALSO for ordinary bad input (a garbage trail id,
+ * a malformed cursor), so a 400 must not buy the full 30s capture window and
+ * the "reload NOW" prompt — that stalled every bad-input call (fleet-audit#41).
+ * A tab that is actively browsing will emit an API request well within this.
+ */
+export const ROTATION_PROBE_TIMEOUT_MS = 3000;
+
+/** How a key capture runs: the full interactive wait, or a short silent probe. */
+interface CaptureMode {
+  timeoutMs?: number;
+  attempts: number;
+  quiet: boolean;
+}
+const FULL_CAPTURE: CaptureMode = { attempts: 3, quiet: false };
+const PROBE_CAPTURE: CaptureMode = { timeoutMs: ROTATION_PROBE_TIMEOUT_MS, attempts: 1, quiet: true };
 
 export class AllTrailsClient {
   private transport: FetchproxyTransport | undefined;
@@ -113,10 +132,10 @@ export class AllTrailsClient {
    * traffic when absent (or when the cached key is `invalidKey` — the
    * rotation re-capture). Single-flight: concurrent callers share one capture.
    */
-  private async ensureApiKey(invalidKey?: string): Promise<string> {
+  private async ensureApiKey(invalidKey?: string, mode: CaptureMode = FULL_CAPTURE): Promise<string> {
     if (this.apiKey !== undefined && this.apiKey !== invalidKey) return this.apiKey;
     if (!this.apiKeyPromise) {
-      this.apiKeyPromise = this.captureApiKey(invalidKey).finally(() => {
+      this.apiKeyPromise = this.captureApiKey(invalidKey, mode).finally(() => {
         this.apiKeyPromise = undefined;
       });
     }
@@ -127,19 +146,23 @@ export class AllTrailsClient {
   // up. The stale-key filter matters: our own bridge requests hit the same
   // host/path pattern, so a rotation re-capture could otherwise snapshot one
   // of our own in-flight requests and hand back the key we're replacing.
-  private async captureApiKey(invalidKey?: string): Promise<string> {
+  private async captureApiKey(invalidKey: string | undefined, mode: CaptureMode): Promise<string> {
     const transport = await this.bridgeReady();
     // Printed BEFORE the wait starts, which is the only moment this advice is
-    // actionable — see the throw below for why.
-    console.error(
+    // actionable — see the throw below for why. A 400 probe stays silent: it
+    // is too short to act on and usually means bad input, not a stale key.
+    if (!mode.quiet) console.error(
       '[alltrails-mcp] Capturing the x-at-key app key from the browser — reload a signed-in ' +
         'www.alltrails.com tab NOW, while this is waiting. The key is read off a request the page ' +
         'makes during the wait; a tab that is already loaded and idle will not produce one.',
     );
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < mode.attempts; attempt++) {
       let captured: string;
       try {
-        captured = await transport.server.captureRequestHeader({ ...KEY_CAPTURE });
+        captured = await transport.server.captureRequestHeader({
+          ...KEY_CAPTURE,
+          ...(mode.timeoutMs !== undefined ? { timeoutMs: mode.timeoutMs } : {}),
+        });
       } catch (e) {
         // The capture only fires when the tab itself makes an API request — an
         // idle tab times out. Say what to do, not just what failed.
@@ -212,14 +235,19 @@ export class AllTrailsClient {
       if (res.status === 429) throw new Error('Rate limited by AllTrails API');
     }
     if (res.status === 400 || res.status === 401) {
-      // The rotation signature: AllTrails answers 400/401 when x-at-key is
-      // missing or stale. Try to capture a DIFFERENT key from the tab; if the
-      // app is still using ours, the capture keeps seeing the stale value and
-      // throws — the failure was the request itself, so keep the original
-      // error. Only a genuinely fresh key earns the one replay.
+      // The rotation signature: AllTrails answers 401 (and sometimes 400) when
+      // x-at-key is missing or stale. Try to capture a DIFFERENT key from the
+      // tab; if the app is still using ours, the capture keeps seeing the stale
+      // value and throws — the failure was the request itself, so keep the
+      // original error. Only a genuinely fresh key earns the one replay.
+      //
+      // A 400 is far more often plain bad input (a garbage id, a bad cursor),
+      // so it gets one short, silent probe instead of the full interactive
+      // capture — a bad-input call must not stall for the whole capture
+      // timeout (fleet-audit#41).
       const staleKey = this.apiKey;
       try {
-        await this.ensureApiKey(staleKey);
+        await this.ensureApiKey(staleKey, res.status === 401 ? FULL_CAPTURE : PROBE_CAPTURE);
       } catch {
         // No fresh key obtainable — fall through to the original response.
       }
