@@ -29,6 +29,14 @@ export const jsonResponse = minifiedResult;
  */
 export const ALLTRAILS_VIEWS = ['compact', 'full'] as const;
 
+/**
+ * Request options for AllTrails' read-only POST endpoints (explore search /
+ * suggestions, reviews search). They query, never mutate, so they keep the
+ * bridge's cold-start retry after a transport timeout — which @fetchproxy 3.2
+ * otherwise withholds from every non-GET.
+ */
+export const READ_ONLY_POST = { retryOnTimeout: true } as const;
+
 // Raw-string tool result. Wrapper over @chrischall/mcp-utils' `rawTextResult`.
 export const textResponse = rawTextResult;
 

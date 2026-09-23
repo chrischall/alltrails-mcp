@@ -6,6 +6,7 @@ import { parseAllTrails } from '../validate.js';
 import {
   ALLTRAILS_VIEWS,
   LocationSuggestSchema,
+  READ_ONLY_POST,
   SearchResponseSchema,
   jsonResponse,
   summarizeLocation,
@@ -91,7 +92,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
           query: args.query,
           limit,
           recordTypesToReturn: args.types ?? [...SUGGESTION_RECORD_TYPES],
-        });
+        }, READ_ONLY_POST);
       } else {
         // Legacy no-query browse. The endpoint ignores every body param except
         // limit (probed 2026-07-02); lat/lng are still forwarded for
@@ -100,7 +101,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
         const body: Record<string, unknown> = { limit };
         if (args.lat !== undefined) body.lat = args.lat;
         if (args.lng !== undefined) body.lng = args.lng;
-        raw = await client.request('POST', '/api/alltrails/explore/v1/search', body);
+        raw = await client.request('POST', '/api/alltrails/explore/v1/search', body, READ_ONLY_POST);
       }
       if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
         const parsed = parseAllTrails(SearchResponseSchema, raw, ctx);
@@ -149,7 +150,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
         query: args.query,
         limit,
         recordTypesToReturn: args.kinds ?? [...LOCATION_RECORD_TYPES],
-      });
+      }, READ_ONLY_POST);
       const parsed = parseAllTrails(
         LocationSuggestSchema,
         raw,

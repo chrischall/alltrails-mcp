@@ -82,13 +82,13 @@ describe('alltrails_get_trail_reviews', () => {
   it('POSTs with a default limit of 20', async () => {
     const { client, handlers } = setup({ trail_reviews: [] });
     await handlers.get('alltrails_get_trail_reviews')!({ trailId: '5' });
-    expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/v2/trails/5/reviews/search', { limit: 20 });
+    expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/v2/trails/5/reviews/search', { limit: 20 }, { retryOnTimeout: true });
   });
 
   it('passes an explicit limit', async () => {
     const { client, handlers } = setup({ trail_reviews: [] });
     await handlers.get('alltrails_get_trail_reviews')!({ trailId: '5', limit: 3 });
-    expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/v2/trails/5/reviews/search', { limit: 3 });
+    expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/v2/trails/5/reviews/search', { limit: 3 }, { retryOnTimeout: true });
   });
 
   it('projects by default', async () => {

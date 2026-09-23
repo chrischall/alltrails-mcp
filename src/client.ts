@@ -36,6 +36,15 @@ interface BridgeResult {
   body: string;
 }
 
+/** Per-request options for {@link AllTrailsClient.request}. */
+export interface RequestOptions {
+  /**
+   * Re-send after a bridge transport timeout. Pass `true` ONLY for a
+   * provably read-only POST — re-sending a write could apply it twice.
+   */
+  retryOnTimeout?: boolean;
+}
+
 /** The AllTrails protocol headers an in-tab fetch does NOT add on its own. */
 function protocolHeaders(apiKey: string, hasBody: boolean): Record<string, string> {
   const headers: Record<string, string> = {
@@ -160,9 +169,16 @@ export class AllTrailsClient {
     );
   }
 
-  /** Issue an authenticated JSON request and parse the response body. */
-  async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await this.fetchWithRetry(method, path, body);
+  /**
+   * Issue an authenticated JSON request and parse the response body.
+   *
+   * `opts.retryOnTimeout` opts a read-only POST (a search / suggestions
+   * lookup) back into the bridge's cold-start retry after a transport
+   * timeout; since @fetchproxy 3.2 only GET/HEAD/OPTIONS retry by default.
+   * Never pass it for a request that creates or changes anything.
+   */
+  async request<T>(method: string, path: string, body?: unknown, opts: RequestOptions = {}): Promise<T> {
+    const res = await this.fetchWithRetry(method, path, body, opts);
     if (debugLogEnabled()) {
       console.error(`[alltrails-debug] response body: ${res.body || '<empty>'}`);
     }
@@ -181,13 +197,18 @@ export class AllTrailsClient {
 
   // The 429 wait-and-replay-once, the rotation re-capture, and the
   // non-2xx → throw.
-  private async fetchWithRetry(method: string, path: string, body: unknown): Promise<BridgeResult> {
-    let res = await this.fetchBridge(method, path, body, false);
+  private async fetchWithRetry(
+    method: string,
+    path: string,
+    body: unknown,
+    opts: RequestOptions,
+  ): Promise<BridgeResult> {
+    let res = await this.fetchBridge(method, path, body, false, opts);
     if (res.status === 429) {
       // Bridge results carry no response headers (so no Retry-After) — wait
       // the fleet's standard 2s and replay once.
       await new Promise<void>((r) => setTimeout(r, 2000));
-      res = await this.fetchBridge(method, path, body, true);
+      res = await this.fetchBridge(method, path, body, true, opts);
       if (res.status === 429) throw new Error('Rate limited by AllTrails API');
     }
     if (res.status === 400 || res.status === 401) {
@@ -203,7 +224,7 @@ export class AllTrailsClient {
         // No fresh key obtainable — fall through to the original response.
       }
       if (this.apiKey !== staleKey) {
-        res = await this.fetchBridge(method, path, body, true);
+        res = await this.fetchBridge(method, path, body, true, opts);
       }
     }
     if (res.status < 200 || res.status >= 300) {
@@ -220,7 +241,13 @@ export class AllTrailsClient {
   // tab. The browser owns Cookie / User-Agent / Origin / Referer; we attach
   // only the protocol headers. Bridge-layer failures (extension down, pairing
   // pending, timeout) are wrapped with the typed error's remediation hint.
-  private async fetchBridge(method: string, path: string, body: unknown, isRetry: boolean): Promise<BridgeResult> {
+  private async fetchBridge(
+    method: string,
+    path: string,
+    body: unknown,
+    isRetry: boolean,
+    opts: RequestOptions,
+  ): Promise<BridgeResult> {
     const headers = protocolHeaders(await this.ensureApiKey(), body !== undefined);
     if (debugLogEnabled()) {
       const bodyPreview = body === undefined ? '<none>' : JSON.stringify(body);
@@ -235,6 +262,7 @@ export class AllTrailsClient {
         path,
         headers,
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        ...(opts.retryOnTimeout !== undefined ? { retryOnTimeout: opts.retryOnTimeout } : {}),
       });
     } catch (e) {
       const info = bridgeErrorInfo(e);

@@ -34,7 +34,7 @@ describe('alltrails_search', () => {
       query: 'angels landing',
       limit: 5,
       recordTypesToReturn: ALL_RECORD_TYPES,
-    });
+    }, { retryOnTimeout: true });
   });
 
   it('does not send lat/lng on the suggestions path (the endpoint ignores them)', async () => {
@@ -44,7 +44,7 @@ describe('alltrails_search', () => {
       query: 'waterfall',
       limit: 20,
       recordTypesToReturn: ALL_RECORD_TYPES,
-    });
+    }, { retryOnTimeout: true });
   });
 
   it('narrows recordTypesToReturn when types is provided', async () => {
@@ -54,13 +54,13 @@ describe('alltrails_search', () => {
       query: 'zion',
       limit: 20,
       recordTypesToReturn: ['trail', 'area'],
-    });
+    }, { retryOnTimeout: true });
   });
 
   it('falls back to the legacy search endpoint with only a limit when no query is given', async () => {
     const { client, handlers } = setup({ searchResults: [] });
     await handlers.get('alltrails_search')!({});
-    expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/explore/v1/search', { limit: 20 });
+    expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/explore/v1/search', { limit: 20 }, { retryOnTimeout: true });
   });
 
   it('includes lat/lng on the legacy path even when they are zero (falsy but defined)', async () => {
@@ -70,7 +70,7 @@ describe('alltrails_search', () => {
       limit: 20,
       lat: 0,
       lng: 0,
-    });
+    }, { retryOnTimeout: true });
   });
 
   it('projects suggestions results and enforces the limit client-side', async () => {
@@ -95,7 +95,7 @@ describe('alltrails_search', () => {
   it('works on the legacy no-query path and omits totalCount when summary is absent', async () => {
     const { client, handlers } = setup({ searchResults: [{ ID: 1, name: 'A' }] });
     const result = await handlers.get('alltrails_search')!({});
-    expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/explore/v1/search', { limit: 20 });
+    expect(client.request).toHaveBeenCalledWith('POST', '/api/alltrails/explore/v1/search', { limit: 20 }, { retryOnTimeout: true });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.totalCount).toBeUndefined();
     expect(parsed.count).toBe(1);
@@ -119,7 +119,7 @@ describe('alltrails_resolve_location', () => {
       query: 'portland',
       limit: 10,
       recordTypesToReturn: ['country', 'state', 'city', 'area', 'poi'],
-    });
+    }, { retryOnTimeout: true });
   });
 
   it('honors explicit kinds and limit', async () => {
@@ -129,7 +129,7 @@ describe('alltrails_resolve_location', () => {
       query: 'oregon',
       limit: 3,
       recordTypesToReturn: ['state', 'city'],
-    });
+    }, { retryOnTimeout: true });
   });
 
   it('projects the resolved locations and truncates to limit', async () => {
