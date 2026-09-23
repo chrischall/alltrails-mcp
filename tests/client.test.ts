@@ -174,6 +174,18 @@ describe('AllTrailsClient — bridge requests', () => {
     const init = fetch.mock.calls[0][0] as { headers: Record<string, string>; body?: string };
     expect(init.body).toBe(JSON.stringify({ limit: 5 }));
     expect(init.headers['Content-Type']).toBe('application/json');
+    // No opt-in → no retryOnTimeout: a POST is not re-sent after a transport
+    // timeout unless the caller declares it a read.
+    expect(init).not.toHaveProperty('retryOnTimeout');
+  });
+
+  it('passes retryOnTimeout through to the bridge when a read-only POST opts in', async () => {
+    const { transport, fetch } = stubTransport([{ status: 200 }]);
+    const client = new AllTrailsClient({ transport });
+    await client.request('POST', '/api/alltrails/explore/v1/search', { limit: 5 }, { retryOnTimeout: true });
+    const init = fetch.mock.calls[0][0] as { method: string; retryOnTimeout?: boolean };
+    expect(init.method).toBe('POST');
+    expect(init.retryOnTimeout).toBe(true);
   });
 
   it('parses an empty response body as null', async () => {

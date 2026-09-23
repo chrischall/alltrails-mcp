@@ -6,6 +6,7 @@ import { OfflineTrailSchema, trailToGpx } from '../gpx.js';
 import {
   ALLTRAILS_VIEWS,
   PhotoListSchema,
+  READ_ONLY_POST,
   ReviewListSchema,
   TrailDetailSchema,
   jsonResponse,
@@ -84,6 +85,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         'POST',
         `/api/alltrails/v2/trails/${encodeURIComponent(args.trailId)}/reviews/search`,
         { limit: args.limit ?? 20 },
+        READ_ONLY_POST,
       );
       const parsed = parseAllTrails(
         ReviewListSchema,
