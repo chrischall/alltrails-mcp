@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.1](https://github.com/chrischall/alltrails-mcp/compare/v3.1.0...v3.1.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **deps:** require zod ^4.6.5 to match @chrischall/mcp-utils 2.4.0 ([#125](https://github.com/chrischall/alltrails-mcp/issues/125)) ([1ab9c42](https://github.com/chrischall/alltrails-mcp/commit/1ab9c4293b1c6f7701e35dd87c24df32eaf19e62))
+* **deps:** upgrade @chrischall/mcp-utils to 2.4.0 and @fetchproxy/* to 3.2.0 ([#123](https://github.com/chrischall/alltrails-mcp/issues/123)) ([23ab7ac](https://github.com/chrischall/alltrails-mcp/commit/23ab7ac91c46b744f2bd1f8e86da11eddf6a51c8))
+
 ## [3.1.0](https://github.com/chrischall/alltrails-mcp/compare/v3.0.0...v3.1.0) (2026-09-19)
 
 
