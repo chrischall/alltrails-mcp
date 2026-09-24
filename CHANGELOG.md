@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.3](https://github.com/chrischall/alltrails-mcp/compare/v3.1.2...v3.1.3) (2026-09-24)
+
+
+### Bug Fixes
+
+* **debug:** stop ALLTRAILS_DEBUG_LOG writing response bodies to stderr ([#134](https://github.com/chrischall/alltrails-mcp/issues/134)) ([237bb61](https://github.com/chrischall/alltrails-mcp/commit/237bb61fa95904df7a8d0396257f191ce8331412))
+* **deps:** Bump dotenv in the production-dependencies group ([#132](https://github.com/chrischall/alltrails-mcp/issues/132)) ([0bdbf7d](https://github.com/chrischall/alltrails-mcp/commit/0bdbf7d6de7d601952b6dbcce1e1edd11ed824a6))
+
 ## [3.1.2](https://github.com/chrischall/alltrails-mcp/compare/v3.1.1...v3.1.2) (2026-09-23)
 
 
