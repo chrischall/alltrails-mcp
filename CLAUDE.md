@@ -45,7 +45,7 @@ ALLTRAILS_USER_ID             Optional. Numeric user id for the per-user tools; 
 ALLTRAILS_CALLER              Optional. Overrides the x-at-caller header (default "Mugen")
 ALLTRAILS_LOCALE              Optional. Overrides the x-language-locale header (default "en-US")
 ALLTRAILS_REQUEST_TIMEOUT_MS  Optional. Per-request timeout in ms (default 30000). Forwarded as the bridge's fetchTimeoutMs
-ALLTRAILS_DEBUG_LOG           Optional. "1|true|yes|on" → log every request/response to stderr; also enables the bridge transport's per-request debug logging. Diagnostic only
+ALLTRAILS_DEBUG_LOG           Optional. "1|true|yes|on" → log each request/response to stderr (method, path, status, response byte length, redacted 200-char request-body prefix — never response bodies); also enables the bridge transport's per-request debug logging. Diagnostic only
 ```
 
 `config.ts` reads env vars through `readEnvVar`/`readPortEnv`, which treat blank values, the strings `"undefined"`/`"null"`, and unsubstituted `${VAR}` placeholders as unset — defensive against MCP hosts passing the env block through unexpanded.
