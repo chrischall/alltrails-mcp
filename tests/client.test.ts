@@ -368,7 +368,37 @@ describe('ALLTRAILS_DEBUG_LOG', () => {
     expect(dbg.some((l) => l.includes('→ POST') && l.includes('via bridge'))).toBe(true);
     expect(dbg.some((l) => l.includes('"limit":3'))).toBe(true);
     expect(dbg.some((l) => l.includes('← 200'))).toBe(true);
-    expect(dbg.some((l) => l.includes('response body:'))).toBe(true);
+    expect(dbg.some((l) => l.includes('response body: 11 bytes'))).toBe(true);
+  });
+
+  it('never logs response body content — only its byte length (profile/feeds carry PII)', async () => {
+    const pii = '{"user":{"email":"hiker@example.test","first_name":"Pat"}}';
+    const { transport } = stubTransport([{ status: 200, body: pii }]);
+    await new AllTrailsClient({ transport }).request('GET', '/api/alltrails/me');
+    const all = errSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(all).not.toContain('hiker@example.test');
+    expect(all).not.toContain('Pat');
+    expect(all).toContain(`response body: ${Buffer.byteLength(pii)} bytes`);
+  });
+
+  it('logs only a bounded, redacted prefix of the request body', async () => {
+    const { transport } = stubTransport([{ status: 200, body: '{}' }]);
+    const body = { query: 'x'.repeat(500), token: 'Bearer abcdefghijklmnopqrstuvwxyz0123456789' };
+    await new AllTrailsClient({ transport }).request('POST', '/api/alltrails/x', body);
+    const line = errSpy.mock.calls.map((c) => String(c[0])).find((l) => l.includes('  body:'));
+    expect(line).toBeDefined();
+    expect(line).toContain(`${Buffer.byteLength(JSON.stringify(body))} bytes`);
+    expect(line!.length).toBeLessThan(300);
+    expect(line).not.toContain('x'.repeat(250));
+  });
+
+  it('redacts secrets in the request-body prefix', async () => {
+    const { transport } = stubTransport([{ status: 200, body: '{}' }]);
+    await new AllTrailsClient({ transport }).request('POST', '/api/alltrails/x', {
+      auth: 'Bearer abcdefghijklmnopqrstuvwxyz0123456789',
+    });
+    const all = errSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(all).not.toContain('abcdefghijklmnopqrstuvwxyz0123456789');
   });
 
   it('logs <none> for a bodyless request', async () => {

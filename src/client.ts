@@ -18,7 +18,7 @@
 // once. A 400 is usually just bad input, so it only earns a single short,
 // silent probe (see ROTATION_PROBE_TIMEOUT_MS) rather than the full capture.
 
-import { loadDotenvSafely, messageOf } from '@chrischall/mcp-utils';
+import { loadDotenvSafely, messageOf, redactSecrets } from '@chrischall/mcp-utils';
 import { bridgeErrorInfo, type FetchproxyTransport } from '@chrischall/mcp-utils/fetchproxy';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -203,7 +203,10 @@ export class AllTrailsClient {
   async request<T>(method: string, path: string, body?: unknown, opts: RequestOptions = {}): Promise<T> {
     const res = await this.fetchWithRetry(method, path, body, opts);
     if (debugLogEnabled()) {
-      console.error(`[alltrails-debug] response body: ${res.body || '<empty>'}`);
+      // Length only: /me carries the user's email/profile and the feeds carry
+      // other users' names — stderr lands in mcp-host's log store (fleet-audit#976).
+      const size = res.body ? `${Buffer.byteLength(res.body)} bytes` : '<empty>';
+      console.error(`[alltrails-debug] response body: ${size}`);
     }
     if (!res.body) return null as T;
     try {
@@ -278,7 +281,7 @@ export class AllTrailsClient {
   ): Promise<BridgeResult> {
     const headers = protocolHeaders(await this.ensureApiKey(), body !== undefined);
     if (debugLogEnabled()) {
-      const bodyPreview = body === undefined ? '<none>' : JSON.stringify(body);
+      const bodyPreview = body === undefined ? '<none>' : debugBodyPreview(JSON.stringify(body));
       console.error(`[alltrails-debug] → ${method} ${path} via bridge${isRetry ? ' (retry)' : ''}`);
       console.error(`[alltrails-debug]   body: ${bodyPreview}`);
     }
@@ -301,6 +304,16 @@ export class AllTrailsClient {
     }
     return result;
   }
+}
+
+// Debug-log shape for a request body: byte length plus a bounded,
+// secret-redacted prefix — enough to diagnose a bad query without dumping a
+// whole payload into stderr (which mcp-host persists).
+const DEBUG_BODY_PREFIX = 200;
+function debugBodyPreview(json: string): string {
+  const prefix = redactSecrets(json.slice(0, DEBUG_BODY_PREFIX));
+  const more = json.length > DEBUG_BODY_PREFIX ? '…' : '';
+  return `${Buffer.byteLength(json)} bytes ${prefix}${more}`;
 }
 
 export const client = new AllTrailsClient();
