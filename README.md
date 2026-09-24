@@ -99,7 +99,7 @@ The `x-at-key` app key AllTrails' own client sends is **never stored in this rep
 | `ALLTRAILS_WS_PORT` | No | fetchproxy concentrator port (default `37149`, shared by the whole fetchproxy fleet — override only for local dev/tests). |
 | `ALLTRAILS_LOCALE` / `ALLTRAILS_CALLER` | No | Override the corresponding request headers. |
 | `ALLTRAILS_REQUEST_TIMEOUT_MS` | No | Per-request timeout in ms (default `30000`), applied on both paths. |
-| `ALLTRAILS_DEBUG_LOG` | No | `1`/`true`/`yes`/`on` logs every request/response to stderr (Cookie redacted). |
+| `ALLTRAILS_DEBUG_LOG` | No | `1`/`true`/`yes`/`on` logs each request/response to stderr — method, path, status, response size, and a redacted 200-char request-body prefix (response bodies are never logged). |
 
 ## Available tools
 
@@ -159,7 +159,7 @@ route geometry from `alltrails_get_trail`.
 
 **"AllTrails: capturing the x-at-key app key failed…"** — the key is read off a request your tab makes **while the call is waiting**, and an idle tab makes none. Refreshing first does not help: the extension only listens for the duration of the call, so a reload that finished before it started happened while nothing was listening. Run the tool again and reload a signed-in www.alltrails.com tab while it is running.
 
-**Empty / unexpected results** — the internal AllTrails endpoints are undocumented and change over time; responses may shift. Enable `ALLTRAILS_DEBUG_LOG=1` to inspect the raw traffic on stderr.
+**Empty / unexpected results** — the internal AllTrails endpoints are undocumented and change over time; responses may shift. Enable `ALLTRAILS_DEBUG_LOG=1` to trace each request's method, path, status and response size on stderr.
 
 ## Development
 

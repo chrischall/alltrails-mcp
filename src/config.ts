@@ -53,7 +53,9 @@ export function getWsPort(): number {
 }
 
 // Set ALLTRAILS_DEBUG_LOG=1 (or true/yes/on) to log every request/response to
-// stderr. The Cookie header is redacted. Diagnostic only — never in normal use.
+// stderr: method, path, status, response byte length, and a bounded,
+// secret-redacted prefix of the request body. Response bodies are never
+// logged (they carry profile/feed PII). Diagnostic only — never in normal use.
 export function debugLogEnabled(): boolean {
   return parseBoolEnv('ALLTRAILS_DEBUG_LOG');
 }
