@@ -401,6 +401,22 @@ describe('ALLTRAILS_DEBUG_LOG', () => {
     expect(all).not.toContain('abcdefghijklmnopqrstuvwxyz0123456789');
   });
 
+  it('redacts a secret that straddles the prefix boundary', async () => {
+    // JSON.stringify gives `{"filler":"<165>","password":"` = 190 chars, so the
+    // password value starts inside the 200-char window and ends outside it.
+    // Truncating before redacting would leave an unterminated `"password":"…`
+    // that the JSON-secret pattern can't match, leaking the in-window prefix.
+    const secret = 'STRADDLE-SECRET-0123456789abcdefghijklmnopqrstuvwxyz';
+    const { transport } = stubTransport([{ status: 200, body: '{}' }]);
+    await new AllTrailsClient({ transport }).request('POST', '/api/alltrails/x', {
+      filler: 'f'.repeat(165),
+      password: secret,
+    });
+    const all = errSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(all).not.toContain('STRADDLE');
+    expect(all).toContain('"password":"[REDACTED]');
+  });
+
   it('logs <none> for a bodyless request', async () => {
     const { transport } = stubTransport([{ status: 200 }]);
     await new AllTrailsClient({ transport }).request('GET', '/api/alltrails/x');

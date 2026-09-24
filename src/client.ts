@@ -309,10 +309,13 @@ export class AllTrailsClient {
 // Debug-log shape for a request body: byte length plus a bounded,
 // secret-redacted prefix — enough to diagnose a bad query without dumping a
 // whole payload into stderr (which mcp-host persists).
+// Redact the WHOLE body before bounding it: truncating first can cut a secret
+// mid-value so the redaction patterns no longer match its visible prefix.
 const DEBUG_BODY_PREFIX = 200;
 function debugBodyPreview(json: string): string {
-  const prefix = redactSecrets(json.slice(0, DEBUG_BODY_PREFIX));
-  const more = json.length > DEBUG_BODY_PREFIX ? '…' : '';
+  const redacted = redactSecrets(json);
+  const prefix = redacted.slice(0, DEBUG_BODY_PREFIX);
+  const more = redacted.length > DEBUG_BODY_PREFIX ? '…' : '';
   return `${Buffer.byteLength(json)} bytes ${prefix}${more}`;
 }
 
