@@ -38,10 +38,12 @@ fpx pair -p alltrails                           # prints a pair code → approve
 
 Requirements: the **ContextMint Bridge** browser extension installed
 ([releases](https://github.com/nullnet-app/contextmint-bridge/releases) —
-Chrome: load the chrome zip unpacked; Safari: ships inside the ContextMint app), its Chrome
+Chrome: load the chrome zip unpacked; use Chrome for now — Safari will ship inside the
+ContextMint app, which has no public download yet), its Chrome
 **Site access** allowing `alltrails.com`, and an open, **signed-in**
 `www.alltrails.com` tab (the per-user tools need a real session; the trail
 tools work signed-out too). Pairing persists after the first approval.
+ContextMint Bridge is the fetchproxy extension renamed, same maintainer; source and `.sha256`-checkable release zips at https://github.com/nullnet-app/contextmint-bridge.
 
 ## Capture the app key, then attach it on every call
 

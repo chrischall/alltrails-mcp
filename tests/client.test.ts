@@ -309,6 +309,7 @@ describe('AllTrailsClient — bridge requests', () => {
     expect(err.message).toContain('AllTrails bridge');
     // The typed error's remediation hint must survive verbatim.
     expect(err.message).toContain(down.hint);
+    expect(err.message).toContain("ContextMint Bridge's service worker is not responding");
   });
 
   it('wraps an untyped bridge error without a hint', async () => {
