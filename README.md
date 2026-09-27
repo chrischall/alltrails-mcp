@@ -87,7 +87,9 @@ Ask Claude: *"Search AllTrails for trails near me."*
 
 AllTrails fronts its internal API with DataDome bot protection, and DataDome fingerprints the HTTP client itself — a cookie copied out of the browser and replayed from Node gets rejected even while the browser sails through. So the [fetchproxy](https://github.com/chrischall/fetchproxy) bridge is **required**: every API request runs as a same-origin fetch inside your own signed-in alltrails.com tab, reusing your authenticated session. There is no stored-cookie mode.
 
-Requirements: the [ContextMint Bridge](https://github.com/nullnet-app/contextmint-bridge/releases) browser extension installed (Chrome: download the chrome zip from the releases page and load it unpacked; Safari: it ships inside the ContextMint app), a signed-in alltrails.com tab open, and a one-time pair-code approval on first use (the trust persists).
+Requirements: the [ContextMint Bridge](https://github.com/nullnet-app/contextmint-bridge/releases) browser extension installed (Chrome: download the chrome zip from the releases page and load it unpacked — use Chrome for now; Safari support will ship inside the ContextMint app, which has no public download yet), a signed-in alltrails.com tab open, and a one-time pair-code approval on first use (the trust persists).
+
+ContextMint Bridge is the fetchproxy browser extension under its new name, from the same maintainer — fetchproxy's own README (https://github.com/chrischall/fetchproxy#extension) points to it. Its source is public at https://github.com/nullnet-app/contextmint-bridge: build it yourself, or check a release zip against the `.sha256` file published beside it (`shasum -a 256 -c contextmint-bridge-chrome-<version>.zip.sha256`).
 
 The `x-at-key` app key AllTrails' own client sends is **never stored in this repo or your config** — the server captures the live value from your tab's own API traffic on first need, keeps it in memory only, and re-captures automatically if AllTrails rotates it. The `alltrails_healthcheck` tool round-trips a probe through the bridge and tells you which hop broke.
 
