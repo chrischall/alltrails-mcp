@@ -33,10 +33,12 @@ npm install -g @fetchproxy/cli                  # provides `fpx`
 fpx profile add alltrails --domain alltrails.com
 fpx profile declare alltrails \
   --capture-header 'x-at-key@www.alltrails.com/api/alltrails/*'
-fpx pair -p alltrails                           # prints a pair code → approve in Transporter
+fpx pair -p alltrails                           # prints a pair code → approve in ContextMint Bridge
 ```
 
-Requirements: the **Transporter** browser extension installed, its Chrome
+Requirements: the **ContextMint Bridge** browser extension installed
+([releases](https://github.com/nullnet-app/contextmint-bridge/releases) —
+Chrome: load the chrome zip unpacked; Safari: ships inside the ContextMint app), its Chrome
 **Site access** allowing `alltrails.com`, and an open, **signed-in**
 `www.alltrails.com` tab (the per-user tools need a real session; the trail
 tools work signed-out too). Pairing persists after the first approval.

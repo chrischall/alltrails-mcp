@@ -26,7 +26,7 @@ Ask Claude things like:
 
 - [Claude Desktop](https://claude.ai/download) (or any MCP host)
 - [Node.js](https://nodejs.org) 22.5 or later
-- The [fetchproxy Transporter](https://github.com/chrischall/fetchproxy) browser extension and a signed-in alltrails.com tab (see [Authentication](#authentication))
+- The [ContextMint Bridge](https://github.com/nullnet-app/contextmint-bridge/releases) browser extension and a signed-in alltrails.com tab (see [Authentication](#authentication))
 
 ## Acknowledgement of Terms
 
@@ -87,7 +87,7 @@ Ask Claude: *"Search AllTrails for trails near me."*
 
 AllTrails fronts its internal API with DataDome bot protection, and DataDome fingerprints the HTTP client itself — a cookie copied out of the browser and replayed from Node gets rejected even while the browser sails through. So the [fetchproxy](https://github.com/chrischall/fetchproxy) bridge is **required**: every API request runs as a same-origin fetch inside your own signed-in alltrails.com tab, reusing your authenticated session. There is no stored-cookie mode.
 
-Requirements: the fetchproxy Transporter extension installed, a signed-in alltrails.com tab open, and a one-time pair-code approval on first use (the trust persists).
+Requirements: the [ContextMint Bridge](https://github.com/nullnet-app/contextmint-bridge/releases) browser extension installed (Chrome: download the chrome zip from the releases page and load it unpacked; Safari: it ships inside the ContextMint app), a signed-in alltrails.com tab open, and a one-time pair-code approval on first use (the trust persists).
 
 The `x-at-key` app key AllTrails' own client sends is **never stored in this repo or your config** — the server captures the live value from your tab's own API traffic on first need, keeps it in memory only, and re-captures automatically if AllTrails rotates it. The `alltrails_healthcheck` tool round-trips a probe through the bridge and tells you which hop broke.
 
@@ -155,7 +155,7 @@ route geometry from `alltrails_get_trail`.
 
 **403 Forbidden** — AllTrails' DataDome protection rejected the request. This usually means the tab isn't signed in (or DataDome is challenging it) — sign into alltrails.com in an open tab and retry.
 
-**"AllTrails bridge: …"** — the bridge itself failed before reaching AllTrails (extension not running, pairing not approved, no tab). Run `alltrails_healthcheck` for a diagnosis, and check the Transporter extension popup.
+**"AllTrails bridge: …"** — the bridge itself failed before reaching AllTrails (extension not running, pairing not approved, no tab). Run `alltrails_healthcheck` for a diagnosis, and check the ContextMint Bridge extension popup.
 
 **"AllTrails: capturing the x-at-key app key failed…"** — the key is read off a request your tab makes **while the call is waiting**, and an idle tab makes none. Refreshing first does not help: the extension only listens for the duration of the call, so a reload that finished before it started happened while nothing was listening. Run the tool again and reload a signed-in www.alltrails.com tab while it is running.
 
@@ -194,7 +194,7 @@ tests/              Mirrors src/; mocks AllTrailsClient.request via vi.spyOn
 
 Every API request runs as a same-origin fetch inside your signed-in alltrails.com tab, via the fetchproxy bridge (`src/transport.ts`, the shared `createFetchproxyTransport` factory). The browser carries its own cookies; the server attaches only the AllTrails protocol headers (`x-at-key` etc.), which an in-tab fetch doesn't add on its own. There is no Node-direct mode — DataDome fingerprints the HTTP client, so only in-tab requests are reliable.
 
-Also see the [fetchproxy README](https://github.com/chrischall/fetchproxy) for extension install instructions.
+See [Authentication](#authentication) for installing the [ContextMint Bridge](https://github.com/nullnet-app/contextmint-bridge/releases) extension.
 
 ## License
 

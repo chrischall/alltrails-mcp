@@ -44,7 +44,7 @@ export function getRequestTimeoutMs(): number {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_REQUEST_TIMEOUT_MS;
 }
 
-// The fetchproxy concentrator port. The whole fleet (and the Transporter
+// The fetchproxy concentrator port. The whole fleet (and the ContextMint Bridge
 // extension) shares 37149; override with ALLTRAILS_WS_PORT only for local
 // development or test isolation.
 const DEFAULT_WS_PORT = 37_149;

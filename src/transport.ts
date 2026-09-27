@@ -40,7 +40,7 @@ export function createAllTrailsTransport(
   createServer?: (opts: FetchproxyServerOpts) => FetchproxyServer,
 ): FetchproxyTransport {
   return createFetchproxyTransport({
-    // The whole fetchproxy fleet shares ONE concentrator port — the Transporter
+    // The whole fetchproxy fleet shares ONE concentrator port — the ContextMint Bridge
     // extension dials it, and servers host/peer-elect on it. Never default to a
     // "unique" port; override only for test isolation.
     port: getWsPort(),

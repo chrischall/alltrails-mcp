@@ -40,7 +40,7 @@ Tool files use `server.registerTool(name, schema, handler)` and export `register
 ## Environment
 
 ```
-ALLTRAILS_WS_PORT             Optional. fetchproxy concentrator port (default 37149 — the WHOLE fleet + the Transporter extension share it; override only for local dev/test isolation)
+ALLTRAILS_WS_PORT             Optional. fetchproxy concentrator port (default 37149 — the WHOLE fleet + the ContextMint Bridge extension share it; override only for local dev/test isolation)
 ALLTRAILS_USER_ID             Optional. Numeric user id for the per-user tools; skips the /api/alltrails/me lookup (or targets another public profile)
 ALLTRAILS_CALLER              Optional. Overrides the x-at-caller header (default "Mugen")
 ALLTRAILS_LOCALE              Optional. Overrides the x-language-locale header (default "en-US")
@@ -60,7 +60,7 @@ AllTrails has **no username/password → token exchange**, and DataDome fingerpr
 
 Response handling: `429` → wait 2s and replay once (bridge results carry no headers, so no `Retry-After`), then throw. `401` → the rotation signature: re-capture the app key (discarding values equal to the stale one) and replay once if a genuinely fresh key arrived; otherwise surface the original error. `400` is usually bad input, so it gets only one short (`ROTATION_PROBE_TIMEOUT_MS`), silent capture probe before the same replay-or-surface decision — never the full interactive capture wait. Non-2xx → throw (`401`/`403` get a signed-in-tab hint). A 2xx non-JSON body is a DataDome interstitial → actionable error, never a bare SyntaxError.
 
-Onboarding: first bridge use shows a pair code in the Transporter extension popup (one-time, persists per identity). A signed-in alltrails.com tab must be open. `alltrails_healthcheck` diagnoses which hop broke.
+Onboarding: first bridge use shows a pair code in the ContextMint Bridge extension popup (one-time, persists per identity). A signed-in alltrails.com tab must be open. `alltrails_healthcheck` diagnoses which hop broke.
 
 Testing seams: client tests inject a stub `FetchproxyTransport` via the constructor; transport tests inject a mock `FetchproxyServer` via `createAllTrailsTransport`'s `createServer` argument — no `vi.mock('@fetchproxy/server')`.
 
@@ -154,6 +154,6 @@ skills/alltrails/SKILL.md   Claude Code skill describing when/how to use the too
 - **ESM + NodeNext**: imports must use `.js` extensions even for `.ts` sources (e.g. `import { client } from './client.js'`).
 - **stdio transport**: stdout is reserved for JSON-RPC. All logging goes to **stderr** (`console.error`).
 - **Bridge required, no credential**: unlike the token-based siblings there is no resolved credential and no stored-cookie fallback — the signed-in tab IS the session, and DataDome 403s Node-originated requests regardless of cookie freshness.
-- **Port 37149 is fleet-shared**: the Transporter extension dials that one concentrator port; never default this MCP to a different one.
+- **Port 37149 is fleet-shared**: the ContextMint Bridge extension dials that one concentrator port; never default this MCP to a different one.
 - **Read-only**: no write tools exist. Keep it that way unless AllTrails write endpoints are actually needed and verified.
 - **AI-maintained**: README warns this codebase is built and maintained by Claude; `src/index.ts` prints the same notice (plus the unofficial/ToS caveat) to stderr on startup.

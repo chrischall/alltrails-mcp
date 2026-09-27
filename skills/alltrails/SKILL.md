@@ -27,7 +27,7 @@ Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
 }
 ```
 
-Every API request routes through the **fetchproxy** browser bridge — it runs as a same-origin fetch inside your signed-in alltrails.com tab (DataDome fingerprints Node-originated requests, so there is no stored-cookie mode). Requirements: the fetchproxy Transporter extension installed, a signed-in alltrails.com tab open, and a one-time pair-code approval on first use. The `x-at-key` app key is never stored in code or config — it is captured live from the tab's own API traffic and held in memory only.
+Every API request routes through the **fetchproxy** browser bridge — it runs as a same-origin fetch inside your signed-in alltrails.com tab (DataDome fingerprints Node-originated requests, so there is no stored-cookie mode). Requirements: the ContextMint Bridge extension installed (https://github.com/nullnet-app/contextmint-bridge/releases), a signed-in alltrails.com tab open, and a one-time pair-code approval on first use. The `x-at-key` app key is never stored in code or config — it is captured live from the tab's own API traffic and held in memory only.
 
 ## Tools
 
