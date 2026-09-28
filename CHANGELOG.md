@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.4](https://github.com/chrischall/alltrails-mcp/compare/v3.1.3...v3.1.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **deps:** move to [@fetchproxy](https://github.com/fetchproxy) 3.4 for ContextMint Bridge errors, capability subsets and managed pins ([#136](https://github.com/chrischall/alltrails-mcp/issues/136)) ([574d7f7](https://github.com/chrischall/alltrails-mcp/commit/574d7f7124fd8fa5486c01d3e5accc92fe329d22))
+* **deps:** move to @chrischall/mcp-utils 2.8 and [@fetchproxy](https://github.com/fetchproxy) 3.4.1 for clearer browser-bridge errors ([#138](https://github.com/chrischall/alltrails-mcp/issues/138)) ([ab6372e](https://github.com/chrischall/alltrails-mcp/commit/ab6372e9c557ba9d89f1e3a7bdb87a10ebcbde9f))
+
 ## [3.1.3](https://github.com/chrischall/alltrails-mcp/compare/v3.1.2...v3.1.3) (2026-09-24)
 
 
