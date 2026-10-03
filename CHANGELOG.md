@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.1.5](https://github.com/chrischall/alltrails-mcp/compare/v3.1.4...v3.1.5) (2026-10-03)
+
+
+### Bug Fixes
+
+* **deps:** bump @chrischall/mcp-utils to 2.12.0 ([#145](https://github.com/chrischall/alltrails-mcp/issues/145)) ([5fff915](https://github.com/chrischall/alltrails-mcp/commit/5fff915025679b6e2469b518d7a0f8aac6ffd2ea))
+* **deps:** bump @chrischall/mcp-utils to 2.13.0 ([#147](https://github.com/chrischall/alltrails-mcp/issues/147)) ([a469fca](https://github.com/chrischall/alltrails-mcp/commit/a469fcaaff308c4949c32bc52933ae469dd9fe6e))
+* **deps:** Bump dotenv in the production-dependencies group ([#141](https://github.com/chrischall/alltrails-mcp/issues/141)) ([930e4ac](https://github.com/chrischall/alltrails-mcp/commit/930e4ac03982b6e0f637be3f41a7c7ab2f78a8e6))
+* keep credentials and report edge_blocked on CDN/WAF blocks (mcp-utils 2.10.0) ([#144](https://github.com/chrischall/alltrails-mcp/issues/144)) ([58cb172](https://github.com/chrischall/alltrails-mcp/commit/58cb1727c6c0996ce2846c7168627ddf54913d9a))
+* report CDN/WAF blocks as edge_blocked, not a rejected credential (mcp-utils 2.9.0) ([#143](https://github.com/chrischall/alltrails-mcp/issues/143)) ([1205ae9](https://github.com/chrischall/alltrails-mcp/commit/1205ae9771f17e18eed5fdb9a58733c07ddd8a94))
+
+
+### Documentation
+
+* replace restated PR and release policy with the fleet-policy pointer ([#146](https://github.com/chrischall/alltrails-mcp/issues/146)) ([bee7de4](https://github.com/chrischall/alltrails-mcp/commit/bee7de4bd49f3eeeaa6b0d44138cdd5c53abdb8b))
+
 ## [3.1.4](https://github.com/chrischall/alltrails-mcp/compare/v3.1.3...v3.1.4) (2026-09-27)
 
 
