@@ -125,15 +125,17 @@ Driven by **release-please**. Authoritative state lives in `.release-please-mani
 
 `tests/version-sync.test.ts` asserts every `// x-release-please-version` literal matches `package.json` — if you add a new version-bearing constant, add the marker comment and register the file in `release-please-config.json`.
 
-### Important
+<!-- pr-workflow:v3 -->
+## Pull requests & release notes
 
-Do NOT manually bump versions or create tags. Conventional-commit PR titles tell release-please what to do: `fix:` → patch, `feat:` → minor, `feat!:` / `BREAKING CHANGE` → major. `chore:`, `docs:`, `ci:`, `test:`, `build:`, `refactor:` don't trigger a release on their own.
+Fleet policy — Conventional-Commit PR titles, labels, the auto-review /
+auto-merge ladder, auto-review follow-up issues, PR timing, and release PRs —
+lives in `~/.claude/CLAUDE.md`. Don't restate it here; the copies drifted.
 
-## Pull requests
-
-**Default workflow: branch + PR. Direct pushes to `main` are blocked by branch protection.** PR titles use conventional-commit prefixes — release-please reads them to pick the next version and write the CHANGELOG entry. Open with `gh pr create`; the auto-review verdict adds `ready-to-merge` on `pass`/`warn`. The repo is squash-only.
-
-**Exception for first-party dependency bumps.** When bumping a package we own (`@chrischall/mcp-utils`, `@chrischall/realty-core`, `@fetchproxy/server` — anything published from a chrischall-owned repo), use a `feat:` or `fix:` prefix instead of `chore:`/`build(deps):` (and if you're labeling the PR, `enhancement`/`bug` instead of `dependencies`). Those bumps deliver real product fixes or features through us, so they should drive a release-please version bump and show up under Features/Bug Fixes in the release notes — not get hidden as an invisible `chore`/under "Dependencies" (which doesn't trigger a release).
+Shared technical conventions (publishing, bundling, versioning guards,
+write-verification, transport archetypes, testing traps) live in
+[`chrischall/workflows`](https://github.com/chrischall/workflows):
+`docs/fleet-conventions.md`, plus `README.md` for the CI pipeline contract.
 
 The CI/release workflows are thin stubs that call the shared `chrischall/workflows` reusable pipelines (`reusable-mcp-ci.yml`, `mcp-publish`), identical to the rest of the fleet.
 
