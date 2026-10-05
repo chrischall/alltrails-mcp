@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.6](https://github.com/chrischall/alltrails-mcp/compare/v3.1.5...v3.1.6) (2026-10-05)
+
+
+### Bug Fixes
+
+* **deps:** require @chrischall/mcp-utils 2.14.0 and MCP SDK 2.3.0 ([#148](https://github.com/chrischall/alltrails-mcp/issues/148)) ([cf9b905](https://github.com/chrischall/alltrails-mcp/commit/cf9b90531e4f7df614bc7ab743af005f0cbd1b79))
+
 ## [3.1.5](https://github.com/chrischall/alltrails-mcp/compare/v3.1.4...v3.1.5) (2026-10-03)
 
 
