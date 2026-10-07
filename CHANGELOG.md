@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.7](https://github.com/chrischall/alltrails-mcp/compare/v3.1.6...v3.1.7) (2026-10-07)
+
+
+### Bug Fixes
+
+* **deps:** pick up browser-bridge approval retry and confirmation-prompt opt-out ([#150](https://github.com/chrischall/alltrails-mcp/issues/150)) ([817e68c](https://github.com/chrischall/alltrails-mcp/commit/817e68c8934d9cb21dea959adcace9eba5d8b0b3))
+
 ## [3.1.6](https://github.com/chrischall/alltrails-mcp/compare/v3.1.5...v3.1.6) (2026-10-05)
 
 
