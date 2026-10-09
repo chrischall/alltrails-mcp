@@ -52,6 +52,7 @@ scripts/
 # CI / local tooling
 .github/
 .claude/
+.gitleaksignore
 
 # Runtime secrets
 .env
