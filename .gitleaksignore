@@ -1,0 +1,6 @@
+# AllTrails' public web-client app key (x-at-key), hard-coded as
+# DEFAULT_ALLTRAILS_API_KEY in 5d8bc74 and removed in a72a2d1 (the key is now
+# captured live from the browser tab and held in memory only). It identifies
+# AllTrails' web client, not a user, and grants no account access, so it needs
+# no rotation and history is not rewritten. chrischall/fleet-audit#829
+5d8bc745392e50405b57cc68f8c85c185ceac3de:src/protocol.ts:generic-api-key:32
