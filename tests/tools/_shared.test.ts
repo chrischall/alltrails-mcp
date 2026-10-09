@@ -508,3 +508,23 @@ describe('summarizeLocation', () => {
     expect(JSON.stringify(s)).toBe('{}');
   });
 });
+
+describe('resolveUserId id validation', () => {
+  it('rejects a non-numeric ALLTRAILS_USER_ID before any request', async () => {
+    process.env.ALLTRAILS_USER_ID = '..';
+    const c = clientReturning({});
+    await expect(resolveUserId(c)).rejects.toThrow(/ALLTRAILS_USER_ID must be a numeric AllTrails user id/);
+    expect(c.request).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-numeric explicit userId', async () => {
+    const c = clientReturning({});
+    await expect(resolveUserId(c, '../x')).rejects.toThrow(/userId must be a numeric AllTrails user id/);
+    expect(c.request).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-numeric id returned by /me', async () => {
+    const c = clientReturning({ users: [{ id: '..' }] });
+    await expect(resolveUserId(c)).rejects.toThrow(/non-numeric user id/);
+  });
+});

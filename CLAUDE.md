@@ -20,10 +20,10 @@ npm run dev          # node --env-file=.env dist/index.js (requires built dist)
 ```
 src/
   index.ts          MCP server entry — runMcp() from @chrischall/mcp-utils (builds McpServer, applies registrars with client as deps, prints banner, wires shutdown + stdio transport)
-  protocol.ts       Wire-level constants (BASE_URL, embedded x-at-key app key, header/UA defaults)
+  protocol.ts       Wire-level constants (BASE_URL, x-at-caller / x-language-locale defaults) — no app key: x-at-key is captured live by client.ts
   transport.ts      createAllTrailsTransport(): the fetchproxy bridge transport (createFetchproxyTransport, port 37149, domains alltrails.com, defaultSubdomain www, createServer test seam)
   client.ts         AllTrailsClient — bridge requests (transport.fetch inside the signed-in tab), live x-at-key capture (memory-only), 429 wait-and-replay, non-JSON interstitial guard
-  config.ts         env-driven header/UA/api-key/user-id/timeout/ws-port/debug getters
+  config.ts         env-driven caller/locale header, user-id, timeout, ws-port and debug getters
   validate.ts       parseAllTrails(): zod validation of AllTrails responses at call sites (lenient reads / strict where a mistype must halt)
   gpx.ts            decodePolyline() (generalized Google polyline varint decoder) + trailToGpx() (offline-detail route geometry → GPX 1.1) + OfflineTrailSchema
   tools/

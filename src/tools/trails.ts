@@ -5,11 +5,13 @@ import type { AllTrailsClient } from '../client.js';
 import { OfflineTrailSchema, trailToGpx } from '../gpx.js';
 import {
   ALLTRAILS_VIEWS,
+  READ_ONLY_ANNOTATIONS,
   PhotoListSchema,
   READ_ONLY_POST,
   ReviewListSchema,
   TrailDetailSchema,
   jsonResponse,
+  numericId,
   summarizePhoto,
   summarizeReview,
   summarizeTrailDetail,
@@ -22,14 +24,15 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool(
     'alltrails_get_trail',
     {
+      title: 'Get AllTrails trail',
       description:
         'Get details for a single AllTrails trail by its numeric trail id. Returns name, location, ' +
         'length, elevation gain, difficulty, rating, route type, and (at higher detail levels) route geometry. ' +
         'Returns a slim projection by default (name, overview, length in m+mi, elevation gain, difficulty, ' +
         'rating, route type, location); pass view:"full" for the whole record and geometry.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
-        trailId: z.string().describe('Numeric AllTrails trail id (e.g. "10236086")'),
+        trailId: numericId('Numeric AllTrails trail id (e.g. "10236086")'),
         detail: z
           .enum(['basic', 'medium', 'offline'])
           .describe(
@@ -49,7 +52,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
       );
       if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
         const parsed = parseAllTrails(TrailDetailSchema, raw, 'GET /api/alltrails/v3/trails/{id}');
-        if (Array.isArray(parsed.trails)) {
+        if (Array.isArray(parsed?.trails)) {
           const trails = parsed.trails.map(summarizeTrailDetail);
           // The envelope is a one-element array in practice; unwrap it so the
           // common case reads as a single object.
@@ -63,12 +66,13 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool(
     'alltrails_get_trail_reviews',
     {
+      title: 'Get AllTrails trail reviews',
       description:
         'Get user reviews for an AllTrails trail by its numeric trail id. Returns just ' +
         '{ user, rating, comment } per review by default; pass view:"full" for the whole records.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
-        trailId: z.string().describe('Numeric AllTrails trail id'),
+        trailId: numericId('Numeric AllTrails trail id'),
         limit: z
           .number()
           .int()
@@ -94,7 +98,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
       );
       if (
         resolveView(args.view, ALLTRAILS_VIEWS) === 'compact' &&
-        Array.isArray(parsed.trail_reviews)
+        Array.isArray(parsed?.trail_reviews)
       ) {
         const reviews = parsed.trail_reviews.map(summarizeReview);
         return jsonResponse({ count: reviews.length, reviews });
@@ -106,13 +110,14 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool(
     'alltrails_get_trail_photos',
     {
+      title: 'Get AllTrails trail photos',
       description:
         'Get photos for an AllTrails trail by its numeric trail id. Returns just ' +
         '{ id, title, likeCount, user, uploadedAt, url } per photo by default — the url serves the actual image; ' +
         'pass view:"full" for the whole records.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
-        trailId: z.string().describe('Numeric AllTrails trail id'),
+        trailId: numericId('Numeric AllTrails trail id'),
         view: viewParam(ALLTRAILS_VIEWS, {
           note: 'compact returns { count, photos: [{ id, title, likeCount, user, uploadedAt, url }] } — the url is DERIVED and signed here, so "full" (AllTrails\' whole photo records) does not contain it. No route geometry either way — that is alltrails_get_trail.',
         }),
@@ -129,7 +134,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
           raw,
           'GET /api/alltrails/v2/trails/{id}/photos',
         );
-        if (Array.isArray(parsed.photos)) {
+        if (Array.isArray(parsed?.photos)) {
           // Sign the derived image URLs with the same live-captured key the
           // request itself used (set by now — the fetch above needed it).
           const photos = parsed.photos.map((p) => summarizePhoto(p, client.currentApiKey()));
@@ -143,13 +148,14 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool(
     'alltrails_get_trail_gpx',
     {
+      title: 'Export AllTrails trail GPX',
       description:
         "Export an AllTrails trail's route as a GPX 1.1 document (track points with per-point elevation), " +
         "built from the trail's offline-detail route geometry. Returns raw GPX XML suitable for saving to " +
         'a .gpx file or importing into navigation apps.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
-        trailId: z.string().describe('Numeric AllTrails trail id'),
+        trailId: numericId('Numeric AllTrails trail id'),
       }),
     },
     async (args) => {
@@ -172,10 +178,11 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool(
     'alltrails_get_trail_weather',
     {
+      title: 'Get AllTrails trail weather',
       description: 'Get the weather overview for an AllTrails trail by its numeric trail id.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
-        trailId: z.string().describe('Numeric AllTrails trail id'),
+        trailId: numericId('Numeric AllTrails trail id'),
       }),
     },
     async (args) => {

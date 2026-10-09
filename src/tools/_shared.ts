@@ -30,6 +30,17 @@ export const jsonResponse = minifiedResult;
 export const ALLTRAILS_VIEWS = ['compact', 'full'] as const;
 
 /**
+ * Annotations every data tool declares: each one only reads, a repeat call
+ * has no extra effect, and each reaches AllTrails (an external service)
+ * through the user's signed-in browser session.
+ */
+export const READ_ONLY_ANNOTATIONS = {
+  readOnlyHint: true,
+  idempotentHint: true,
+  openWorldHint: true,
+} as const;
+
+/**
  * Request options for AllTrails' read-only POST endpoints (explore search /
  * suggestions, reviews search). They query, never mutate, so they keep the
  * bridge's cold-start retry after a transport timeout — which @fetchproxy 3.2
@@ -51,6 +62,25 @@ const MeSchema = z.looseObject({
 });
 
 /**
+ * A numeric AllTrails id (trail, list, user) that gets interpolated into a
+ * request path. Digits only: `encodeURIComponent` leaves `.` alone and the
+ * in-tab fetch normalises dot segments, so an id of `..` would otherwise
+ * retarget the request at a different same-origin endpoint.
+ */
+const NUMERIC_ID = /^\d+$/;
+
+export function numericId(description: string) {
+  return z.string().regex(NUMERIC_ID, 'must be a numeric AllTrails id (digits only)').describe(description);
+}
+
+function requireNumericId(id: string, what: string): string {
+  if (!NUMERIC_ID.test(id)) {
+    throw new Error(`${what} must be a numeric AllTrails user id (digits only), got ${JSON.stringify(id)}.`);
+  }
+  return id;
+}
+
+/**
  * Resolve the AllTrails user id for the per-user endpoints. Priority:
  *   1. an explicit `userId` argument passed to the tool,
  *   2. the ALLTRAILS_USER_ID env var,
@@ -60,8 +90,10 @@ const MeSchema = z.looseObject({
  * isn't actually signed in — `/me` is anonymous).
  */
 export async function resolveUserId(client: AllTrailsClient, provided?: string): Promise<string> {
-  const explicit = provided?.trim() || getConfiguredUserId();
-  if (explicit) return explicit;
+  const arg = provided?.trim();
+  if (arg) return requireNumericId(arg, 'userId');
+  const configured = getConfiguredUserId();
+  if (configured) return requireNumericId(configured, 'ALLTRAILS_USER_ID');
   const me = parseAllTrails(MeSchema, await client.request('GET', '/api/alltrails/me'), 'GET /api/alltrails/me');
   const id = me?.users?.[0]?.id ?? me?.user?.id ?? me?.id;
   if (id === undefined || id === null || `${id}`.length === 0) {
@@ -69,6 +101,9 @@ export async function resolveUserId(client: AllTrailsClient, provided?: string):
       'Could not determine your AllTrails user id from /api/alltrails/me — you may not be signed in. ' +
         'Pass a userId explicitly, set ALLTRAILS_USER_ID, or capture a signed-in browser session.',
     );
+  }
+  if (!NUMERIC_ID.test(`${id}`)) {
+    throw new Error(`GET /api/alltrails/me returned a non-numeric user id (${JSON.stringify(id)}); pass a userId explicitly or set ALLTRAILS_USER_ID.`);
   }
   return `${id}`;
 }

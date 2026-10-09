@@ -5,6 +5,7 @@ import type { AllTrailsClient } from '../client.js';
 import { parseAllTrails } from '../validate.js';
 import {
   ALLTRAILS_VIEWS,
+  READ_ONLY_ANNOTATIONS,
   LocationSuggestSchema,
   READ_ONLY_POST,
   SearchResponseSchema,
@@ -40,6 +41,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
   server.registerTool(
     'alltrails_search',
     {
+      title: 'Search AllTrails',
       description:
         'Search AllTrails by name. A free-text query goes to the suggestions endpoint the alltrails.com ' +
         'search box itself uses — relevance is good and the limit is honored. Results may mix record types ' +
@@ -49,7 +51,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
         "returns trails anchored to the signed-in account's location. Results come back as slim " +
         'per-result summaries, capped at limit client-side, by default; pass view:"full" for ' +
         "AllTrails' whole records.",
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         query: z
           .string()
@@ -105,7 +107,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
       }
       if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
         const parsed = parseAllTrails(SearchResponseSchema, raw, ctx);
-        if (Array.isArray(parsed.searchResults)) {
+        if (Array.isArray(parsed?.searchResults)) {
           // Truncate locally: suggestions honors the limit, but the legacy
           // endpoint has been seen returning hundreds regardless.
           const results = parsed.searchResults.slice(0, limit).map(summarizeSearchResult);
@@ -123,13 +125,14 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
   server.registerTool(
     'alltrails_resolve_location',
     {
+      title: 'Resolve AllTrails location',
       description:
         'Resolve a place name to AllTrails location records — country / state / city / area / point of ' +
         "interest — with each one's kind, coordinates, URL slug, and disambiguation label. Useful for " +
         'pinning down which "Oregon" (state vs the towns) or getting a place\'s coordinates/slug. ' +
         'NOTE: the returned id is an Algolia search id and is NOT the id the trail-listing tools take; ' +
         'to find trails for a place, feed the resolved name back into alltrails_search.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         query: z.string().describe('Place name to resolve, e.g. "portland oregon" or "zion"'),
         kinds: z
@@ -156,7 +159,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
         raw,
         'POST /api/alltrails/explore/v1/suggestions (locations)',
       );
-      if (Array.isArray(parsed.searchResults)) {
+      if (Array.isArray(parsed?.searchResults)) {
         const locations = parsed.searchResults.slice(0, limit).map(summarizeLocation);
         return jsonResponse({ count: locations.length, locations });
       }
