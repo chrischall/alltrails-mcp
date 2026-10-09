@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.1.8](https://github.com/chrischall/alltrails-mcp/compare/v3.1.7...v3.1.8) (2026-10-09)
+
+
+### Bug Fixes
+
+* annotate tools truthfully and sync manifests with the served tools ([#160](https://github.com/chrischall/alltrails-mcp/issues/160)) ([2b13f58](https://github.com/chrischall/alltrails-mcp/commit/2b13f58645a8533322548243104ad417f6a18db8))
+* **client:** stop bad-input 400s waiting on a concurrent key re-capture ([#157](https://github.com/chrischall/alltrails-mcp/issues/157)) ([6a7cc3f](https://github.com/chrischall/alltrails-mcp/commit/6a7cc3fdfb25156e1838cbe4e44a5d9324ba0fac))
+* declare the plugin MCP config under the mcpServers key Claude Code reads ([#161](https://github.com/chrischall/alltrails-mcp/issues/161)) ([fe9ecdd](https://github.com/chrischall/alltrails-mcp/commit/fe9ecdd46c8f37581f3e2f94802c2f2ddb0520a0))
+* **deps:** Bump dotenv ([#154](https://github.com/chrischall/alltrails-mcp/issues/154)) ([adb5817](https://github.com/chrischall/alltrails-mcp/commit/adb5817801ef5f51eb1fc828390e6e9d051bb7d1))
+* **deps:** Bump source-map-js ([#159](https://github.com/chrischall/alltrails-mcp/issues/159)) ([d47caba](https://github.com/chrischall/alltrails-mcp/commit/d47cabaec927dc469a9dc2632ecb77e366a52429))
+* **deps:** update @chrischall/mcp-utils to 3.0.0 ([#158](https://github.com/chrischall/alltrails-mcp/issues/158)) ([527beb2](https://github.com/chrischall/alltrails-mcp/commit/527beb29787c5ce8103bec99f629229c5d46191f))
+* resolve low-severity audit findings ([#156](https://github.com/chrischall/alltrails-mcp/issues/156)) ([e417e84](https://github.com/chrischall/alltrails-mcp/commit/e417e84dca23b9373b4e23cd0602cca46c18ff7d))
+
 ## [3.1.7](https://github.com/chrischall/alltrails-mcp/compare/v3.1.6...v3.1.7) (2026-10-07)
 
 
