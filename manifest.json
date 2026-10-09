@@ -34,7 +34,12 @@
         "${__dirname}/dist/bundle.js"
       ],
       "env": {
-        "ALLTRAILS_USER_ID": "${user_config.alltrails_user_id}"
+        "ALLTRAILS_USER_ID": "${user_config.alltrails_user_id}",
+        "ALLTRAILS_REQUEST_TIMEOUT_MS": "${user_config.alltrails_request_timeout_ms}",
+        "ALLTRAILS_DEBUG_LOG": "${user_config.alltrails_debug_log}",
+        "ALLTRAILS_WS_PORT": "${user_config.alltrails_ws_port}",
+        "ALLTRAILS_LOCALE": "${user_config.alltrails_locale}",
+        "ALLTRAILS_CALLER": "${user_config.alltrails_caller}"
       }
     }
   },
@@ -43,6 +48,36 @@
       "type": "string",
       "title": "AllTrails user id",
       "description": "Optional numeric AllTrails user id for the per-user tools (saved lists, completed trails, activity feed). If omitted, those tools resolve the signed-in user via /api/alltrails/me.",
+      "required": false
+    },
+    "alltrails_request_timeout_ms": {
+      "type": "string",
+      "title": "Request timeout (ms)",
+      "description": "Per-request timeout in ms (default 30000).",
+      "required": false
+    },
+    "alltrails_debug_log": {
+      "type": "string",
+      "title": "Debug log",
+      "description": "1/true/yes/on logs each request/response to stderr — method, path, status, response size, and a redacted 200-char request-body prefix (response bodies are never logged).",
+      "required": false
+    },
+    "alltrails_ws_port": {
+      "type": "string",
+      "title": "fetchproxy port",
+      "description": "fetchproxy concentrator port (default 37149, shared by the whole fetchproxy fleet — override only for local dev/tests).",
+      "required": false
+    },
+    "alltrails_locale": {
+      "type": "string",
+      "title": "Locale header",
+      "description": "Overrides the x-language-locale request header (default \"en-US\").",
+      "required": false
+    },
+    "alltrails_caller": {
+      "type": "string",
+      "title": "Caller header",
+      "description": "Overrides the x-at-caller request header (default \"Mugen\").",
       "required": false
     }
   },
