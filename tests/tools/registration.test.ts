@@ -57,3 +57,21 @@ describe('path id arguments', () => {
     }
   });
 });
+
+describe('tool annotations', () => {
+  const configs = registeredConfigs();
+
+  it('registers all twelve data tools', () => {
+    expect(configs.size).toBe(12);
+  });
+
+  it.each([...registeredConfigs().keys()])(
+    '%s declares itself an idempotent, open-world read with a title',
+    (tool) => {
+      const cfg = configs.get(tool)!;
+      expect(cfg.annotations).toEqual({ readOnlyHint: true, idempotentHint: true, openWorldHint: true });
+      expect(typeof cfg.title).toBe('string');
+      expect(cfg.title!.length).toBeGreaterThan(0);
+    },
+  );
+});

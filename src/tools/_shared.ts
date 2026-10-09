@@ -30,6 +30,17 @@ export const jsonResponse = minifiedResult;
 export const ALLTRAILS_VIEWS = ['compact', 'full'] as const;
 
 /**
+ * Annotations every data tool declares: each one only reads, a repeat call
+ * has no extra effect, and each reaches AllTrails (an external service)
+ * through the user's signed-in browser session.
+ */
+export const READ_ONLY_ANNOTATIONS = {
+  readOnlyHint: true,
+  idempotentHint: true,
+  openWorldHint: true,
+} as const;
+
+/**
  * Request options for AllTrails' read-only POST endpoints (explore search /
  * suggestions, reviews search). They query, never mutate, so they keep the
  * bridge's cold-start retry after a transport timeout — which @fetchproxy 3.2

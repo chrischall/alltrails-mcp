@@ -5,6 +5,7 @@ import type { AllTrailsClient } from '../client.js';
 import { OfflineTrailSchema, trailToGpx } from '../gpx.js';
 import {
   ALLTRAILS_VIEWS,
+  READ_ONLY_ANNOTATIONS,
   PhotoListSchema,
   READ_ONLY_POST,
   ReviewListSchema,
@@ -23,12 +24,13 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool(
     'alltrails_get_trail',
     {
+      title: 'Get AllTrails trail',
       description:
         'Get details for a single AllTrails trail by its numeric trail id. Returns name, location, ' +
         'length, elevation gain, difficulty, rating, route type, and (at higher detail levels) route geometry. ' +
         'Returns a slim projection by default (name, overview, length in m+mi, elevation gain, difficulty, ' +
         'rating, route type, location); pass view:"full" for the whole record and geometry.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         trailId: numericId('Numeric AllTrails trail id (e.g. "10236086")'),
         detail: z
@@ -64,10 +66,11 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool(
     'alltrails_get_trail_reviews',
     {
+      title: 'Get AllTrails trail reviews',
       description:
         'Get user reviews for an AllTrails trail by its numeric trail id. Returns just ' +
         '{ user, rating, comment } per review by default; pass view:"full" for the whole records.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         trailId: numericId('Numeric AllTrails trail id'),
         limit: z
@@ -107,11 +110,12 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool(
     'alltrails_get_trail_photos',
     {
+      title: 'Get AllTrails trail photos',
       description:
         'Get photos for an AllTrails trail by its numeric trail id. Returns just ' +
         '{ id, title, likeCount, user, uploadedAt, url } per photo by default — the url serves the actual image; ' +
         'pass view:"full" for the whole records.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         trailId: numericId('Numeric AllTrails trail id'),
         view: viewParam(ALLTRAILS_VIEWS, {
@@ -144,11 +148,12 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool(
     'alltrails_get_trail_gpx',
     {
+      title: 'Export AllTrails trail GPX',
       description:
         "Export an AllTrails trail's route as a GPX 1.1 document (track points with per-point elevation), " +
         "built from the trail's offline-detail route geometry. Returns raw GPX XML suitable for saving to " +
         'a .gpx file or importing into navigation apps.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         trailId: numericId('Numeric AllTrails trail id'),
       }),
@@ -173,8 +178,9 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
   server.registerTool(
     'alltrails_get_trail_weather',
     {
+      title: 'Get AllTrails trail weather',
       description: 'Get the weather overview for an AllTrails trail by its numeric trail id.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         trailId: numericId('Numeric AllTrails trail id'),
       }),

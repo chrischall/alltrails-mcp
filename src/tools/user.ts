@@ -5,6 +5,7 @@ import type { AllTrailsClient } from '../client.js';
 import { parseAllTrails } from '../validate.js';
 import {
   ALLTRAILS_VIEWS,
+  READ_ONLY_ANNOTATIONS,
   FeedDirectorySchema,
   FeedPageSchema,
   ListItemsSchema,
@@ -22,9 +23,10 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
   server.registerTool(
     'alltrails_get_profile',
     {
+      title: 'Get AllTrails profile',
       description:
         'Get the signed-in AllTrails user profile (via /api/alltrails/me). Requires a signed-in session.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
     async () => {
       const data = await client.request('GET', '/api/alltrails/me');
@@ -35,10 +37,11 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
   server.registerTool(
     'alltrails_list_user_lists',
     {
+      title: 'List AllTrails user lists',
       description:
         "List an AllTrails user's saved lists (favorites, custom lists). Defaults to the signed-in user; " +
         'pass a userId to target a specific public profile.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
       }),
@@ -56,12 +59,13 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
   server.registerTool(
     'alltrails_get_list_items',
     {
+      title: 'Get AllTrails list items',
       description:
         'Get the trails saved in an AllTrails list by its numeric list id (from alltrails_list_user_lists, ' +
         'or a public "list" record from alltrails_search). Items are sparse references: each carries a ' +
         "trailId (hydrate with alltrails_get_trail), the curator's order, and any notes — not trail " +
         'details. Returns slim { trailId, type, order, notes, addedAt } entries sorted by order by default; pass view:"full" for the whole records.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         listId: numericId('Numeric AllTrails list id'),
         view: viewParam(ALLTRAILS_VIEWS, {
@@ -90,10 +94,11 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
   server.registerTool(
     'alltrails_list_completed_trails',
     {
+      title: 'List AllTrails completed trails',
       description:
         'List the trails an AllTrails user has marked completed. Defaults to the signed-in user; pass a userId ' +
         'to target a specific public profile.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
       }),
@@ -111,12 +116,13 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
   server.registerTool(
     'alltrails_get_activity_feed',
     {
+      title: 'Get AllTrails activity feed',
       description:
         "Get an AllTrails user's activity feed (recorded hikes and posts). Defaults to the signed-in user; " +
         'pass a userId to target a specific public profile. Without a feed argument this returns the feed ' +
         'DIRECTORY (the available feeds: local, timeline (following), personal (own posts)) — pass feed to ' +
         'get the actual items. Returns slim projections by default; pass view:"full" for the whole records.',
-      annotations: { readOnlyHint: true },
+      annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
         feed: z
