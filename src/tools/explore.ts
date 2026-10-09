@@ -107,7 +107,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
       }
       if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
         const parsed = parseAllTrails(SearchResponseSchema, raw, ctx);
-        if (Array.isArray(parsed.searchResults)) {
+        if (Array.isArray(parsed?.searchResults)) {
           // Truncate locally: suggestions honors the limit, but the legacy
           // endpoint has been seen returning hundreds regardless.
           const results = parsed.searchResults.slice(0, limit).map(summarizeSearchResult);
@@ -159,7 +159,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
         raw,
         'POST /api/alltrails/explore/v1/suggestions (locations)',
       );
-      if (Array.isArray(parsed.searchResults)) {
+      if (Array.isArray(parsed?.searchResults)) {
         const locations = parsed.searchResults.slice(0, limit).map(summarizeLocation);
         return jsonResponse({ count: locations.length, locations });
       }

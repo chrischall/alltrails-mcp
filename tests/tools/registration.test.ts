@@ -75,3 +75,40 @@ describe('tool annotations', () => {
     },
   );
 });
+
+// client.request returns null for an empty 2xx body. The compact projections
+// used to dereference the lenient-parse result unguarded and throw an opaque
+// "Cannot read properties of null" TypeError instead of passing the empty
+// payload through like view:"full" does.
+describe('empty response body', () => {
+  function handlersReturningNull() {
+    const client = new AllTrailsClient();
+    vi.spyOn(client, 'request').mockResolvedValue(null);
+    const server = new McpServer({ name: 'test', version: '0.0.0' });
+    const handlers = new Map<string, (args: Record<string, unknown>) => Promise<{ content: Array<{ text: string }> }>>();
+    vi.spyOn(server, 'registerTool').mockImplementation((name: string, _cfg: unknown, cb: unknown) => {
+      handlers.set(name, cb as never);
+      return undefined as never;
+    });
+    registerTrailTools(server, client);
+    registerExploreTools(server, client);
+    registerUserTools(server, client);
+    return handlers;
+  }
+
+  it.each<[string, Record<string, unknown>]>([
+    ['alltrails_get_trail', { trailId: '1' }],
+    ['alltrails_get_trail_reviews', { trailId: '1' }],
+    ['alltrails_get_trail_photos', { trailId: '1' }],
+    ['alltrails_search', { query: 'x' }],
+    ['alltrails_search', {}],
+    ['alltrails_resolve_location', { query: 'x' }],
+    ['alltrails_get_list_items', { listId: '1' }],
+    ['alltrails_get_activity_feed', { userId: '1' }],
+    ['alltrails_get_activity_feed', { userId: '1', feed: 'personal' }],
+  ])('%s %j passes an empty body through instead of throwing', async (tool, args) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = await handlersReturningNull().get(tool)!(args);
+    expect(JSON.parse(result.content[0].text)).toBeNull();
+  });
+});

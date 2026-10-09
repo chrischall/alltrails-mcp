@@ -52,7 +52,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
       );
       if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
         const parsed = parseAllTrails(TrailDetailSchema, raw, 'GET /api/alltrails/v3/trails/{id}');
-        if (Array.isArray(parsed.trails)) {
+        if (Array.isArray(parsed?.trails)) {
           const trails = parsed.trails.map(summarizeTrailDetail);
           // The envelope is a one-element array in practice; unwrap it so the
           // common case reads as a single object.
@@ -98,7 +98,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
       );
       if (
         resolveView(args.view, ALLTRAILS_VIEWS) === 'compact' &&
-        Array.isArray(parsed.trail_reviews)
+        Array.isArray(parsed?.trail_reviews)
       ) {
         const reviews = parsed.trail_reviews.map(summarizeReview);
         return jsonResponse({ count: reviews.length, reviews });
@@ -134,7 +134,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
           raw,
           'GET /api/alltrails/v2/trails/{id}/photos',
         );
-        if (Array.isArray(parsed.photos)) {
+        if (Array.isArray(parsed?.photos)) {
           // Sign the derived image URLs with the same live-captured key the
           // request itself used (set by now — the fetch above needed it).
           const photos = parsed.photos.map((p) => summarizePhoto(p, client.currentApiKey()));

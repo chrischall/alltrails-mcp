@@ -80,7 +80,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
       );
       if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
         const parsed = parseAllTrails(ListItemsSchema, raw, 'GET /api/alltrails/lists/{id}/items');
-        if (Array.isArray(parsed.listItems)) {
+        if (Array.isArray(parsed?.listItems)) {
           const items = parsed.listItems
             .map(summarizeListItem)
             .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
@@ -153,7 +153,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         const raw = await client.request('GET', base);
         if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
           const parsed = parseAllTrails(FeedDirectorySchema, raw, 'GET .../feeds');
-          if (Array.isArray(parsed.feeds)) {
+          if (Array.isArray(parsed?.feeds)) {
             return jsonResponse({
               feeds: parsed.feeds.map((f) => ({
                 name: f.name ?? undefined,
@@ -172,7 +172,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
       const raw = await client.request('GET', `${base}/${args.feed}${qs}`);
       if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
         const parsed = parseAllTrails(FeedPageSchema, raw, 'GET .../feeds/{feed}');
-        if (Array.isArray(parsed.sections)) {
+        if (Array.isArray(parsed?.sections)) {
           const items = parsed.sections
             .filter((s) => s.itemData !== undefined && s.itemData !== null)
             .map((s) => summarizeFeedItem(s.itemData!));
