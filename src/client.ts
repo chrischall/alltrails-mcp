@@ -79,6 +79,15 @@ interface CaptureMode {
 const FULL_CAPTURE: CaptureMode = { attempts: 3, quiet: false };
 const PROBE_CAPTURE: CaptureMode = { timeoutMs: ROTATION_PROBE_TIMEOUT_MS, attempts: 1, quiet: true };
 
+/** `promise`, or a rejection once `ms` elapses first. Clears its timer either way. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`key capture still in flight after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 export class AllTrailsClient {
   private transport: FetchproxyTransport | undefined;
   private startPromise: Promise<void> | undefined;
@@ -131,6 +140,12 @@ export class AllTrailsClient {
    * Ensure a usable app key is in memory, capturing it from the tab's own API
    * traffic when absent (or when the cached key is `invalidKey` — the
    * rotation re-capture). Single-flight: concurrent callers share one capture.
+   *
+   * A bounded caller (a 400's probe) that JOINS a capture already in flight
+   * still keeps its own bound: the in-flight capture may be a 401's full
+   * interactive wait (up to 3 × 30s), and inheriting it would bring back the
+   * bad-input stall the probe exists to avoid (fleet-audit#41, #1151). On
+   * timeout it rejects, which the caller treats as "no fresh key".
    */
   private async ensureApiKey(invalidKey?: string, mode: CaptureMode = FULL_CAPTURE): Promise<string> {
     if (this.apiKey !== undefined && this.apiKey !== invalidKey) return this.apiKey;
@@ -138,8 +153,10 @@ export class AllTrailsClient {
       this.apiKeyPromise = this.captureApiKey(invalidKey, mode).finally(() => {
         this.apiKeyPromise = undefined;
       });
+      return this.apiKeyPromise;
     }
-    return this.apiKeyPromise;
+    if (mode.timeoutMs === undefined) return this.apiKeyPromise;
+    return withTimeout(this.apiKeyPromise, mode.timeoutMs);
   }
 
   // One-shot header captures until a value differing from `invalidKey` shows

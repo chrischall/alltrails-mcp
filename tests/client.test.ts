@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FetchproxyBridgeDownError, type FetchproxyTransport } from '@chrischall/mcp-utils/fetchproxy';
-import { AllTrailsClient } from '../src/client.js';
+import { AllTrailsClient, ROTATION_PROBE_TIMEOUT_MS } from '../src/client.js';
 
 const CAPTURED_KEY = 'live-captured-key';
 
@@ -136,6 +136,61 @@ describe('AllTrailsClient — x-at-key live capture', () => {
     expect(captureRequestHeader).toHaveBeenCalledTimes(2);
     const retryInit = fetch.mock.calls[1][0] as { headers: Record<string, string> };
     expect(retryInit.headers['x-at-key']).toBe('rotated-key');
+  });
+
+  it('a 400 probe does not wait out a concurrent 401 full capture: bounded, then the original 400 (fleet-audit#1151)', async () => {
+    vi.useFakeTimers();
+    try {
+      // Route by path so the interleaving of the two concurrent calls cannot
+      // shuffle which one sees which status.
+      let rotated = false;
+      const fetch = vi.fn(async (init: { path: string }) => {
+        if (init.path.endsWith('/warmup')) return { status: 200, body: '{}', url: 'x' };
+        if (init.path.endsWith('/needs-rotation')) {
+          return rotated ? { status: 200, body: '{"ok":true}', url: 'x' } : { status: 401, body: '{}', url: 'x' };
+        }
+        return { status: 400, body: '{"errors":["bad id"]}', url: 'x' };
+      });
+      // First capture: the key. The second is the 401's FULL capture, which
+      // stays pending (an idle tab) until the test releases it.
+      let releaseFull!: (key: string) => void;
+      const fullCapture = new Promise<string>((r) => (releaseFull = r));
+      const captureRequestHeader = vi
+        .fn()
+        .mockResolvedValueOnce('stale-key')
+        .mockImplementation(() => fullCapture);
+      const transport = {
+        start: vi.fn(async () => {}),
+        fetch,
+        server: { captureRequestHeader },
+      } as unknown as FetchproxyTransport;
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const client = new AllTrailsClient({ transport });
+      await client.request('GET', '/api/alltrails/warmup');
+
+      const full = client.request<{ ok: boolean }>('GET', '/api/alltrails/needs-rotation');
+      // Let the 401 reach its capture before the 400 arrives.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(captureRequestHeader).toHaveBeenCalledTimes(2);
+
+      const probe = client.request('GET', '/api/alltrails/trails/garbage');
+      const probeOutcome = probe.then(
+        () => 'resolved',
+        (e: unknown) => String(e),
+      );
+      await vi.advanceTimersByTimeAsync(ROTATION_PROBE_TIMEOUT_MS);
+      // The 400 surfaced after the probe window, while the full capture is
+      // still waiting on the tab.
+      await expect(probeOutcome).resolves.toMatch(/AllTrails API error: 400/);
+
+      rotated = true;
+      releaseFull('rotated-key');
+      await expect(full).resolves.toEqual({ ok: true });
+      // The probe joined the in-flight capture rather than starting its own.
+      expect(captureRequestHeader).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('a 401 keeps the full rotation re-capture (no short timeout)', async () => {
