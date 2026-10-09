@@ -9,6 +9,7 @@ import {
   FeedPageSchema,
   ListItemsSchema,
   jsonResponse,
+  numericId,
   resolveUserId,
   summarizeFeedItem,
   summarizeListItem,
@@ -39,10 +40,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         'pass a userId to target a specific public profile.',
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
-        userId: z
-          .string()
-          .describe('Numeric AllTrails user id. Defaults to the signed-in user.')
-          .optional(),
+        userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
       }),
     },
     async (args) => {
@@ -65,7 +63,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         'details. Returns slim { trailId, type, order, notes, addedAt } entries sorted by order by default; pass view:"full" for the whole records.',
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
-        listId: z.string().describe('Numeric AllTrails list id'),
+        listId: numericId('Numeric AllTrails list id'),
         view: viewParam(ALLTRAILS_VIEWS, {
           note: 'compact returns { count, items: [{ trailId, type, order, notes, addedAt }] } sorted by the curator\'s order; "full" returns AllTrails\' whole list-item records in the order they arrived.',
         }),
@@ -97,10 +95,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         'to target a specific public profile.',
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
-        userId: z
-          .string()
-          .describe('Numeric AllTrails user id. Defaults to the signed-in user.')
-          .optional(),
+        userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
       }),
     },
     async (args) => {
@@ -123,10 +118,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         'get the actual items. Returns slim projections by default; pass view:"full" for the whole records.',
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
-        userId: z
-          .string()
-          .describe('Numeric AllTrails user id. Defaults to the signed-in user.')
-          .optional(),
+        userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
         feed: z
           .enum(['local', 'timeline', 'personal'])
           .describe(

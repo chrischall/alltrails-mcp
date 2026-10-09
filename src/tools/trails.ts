@@ -10,6 +10,7 @@ import {
   ReviewListSchema,
   TrailDetailSchema,
   jsonResponse,
+  numericId,
   summarizePhoto,
   summarizeReview,
   summarizeTrailDetail,
@@ -29,7 +30,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         'rating, route type, location); pass view:"full" for the whole record and geometry.',
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
-        trailId: z.string().describe('Numeric AllTrails trail id (e.g. "10236086")'),
+        trailId: numericId('Numeric AllTrails trail id (e.g. "10236086")'),
         detail: z
           .enum(['basic', 'medium', 'offline'])
           .describe(
@@ -68,7 +69,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         '{ user, rating, comment } per review by default; pass view:"full" for the whole records.',
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
-        trailId: z.string().describe('Numeric AllTrails trail id'),
+        trailId: numericId('Numeric AllTrails trail id'),
         limit: z
           .number()
           .int()
@@ -112,7 +113,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         'pass view:"full" for the whole records.',
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
-        trailId: z.string().describe('Numeric AllTrails trail id'),
+        trailId: numericId('Numeric AllTrails trail id'),
         view: viewParam(ALLTRAILS_VIEWS, {
           note: 'compact returns { count, photos: [{ id, title, likeCount, user, uploadedAt, url }] } — the url is DERIVED and signed here, so "full" (AllTrails\' whole photo records) does not contain it. No route geometry either way — that is alltrails_get_trail.',
         }),
@@ -149,7 +150,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         'a .gpx file or importing into navigation apps.',
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
-        trailId: z.string().describe('Numeric AllTrails trail id'),
+        trailId: numericId('Numeric AllTrails trail id'),
       }),
     },
     async (args) => {
@@ -175,7 +176,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
       description: 'Get the weather overview for an AllTrails trail by its numeric trail id.',
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
-        trailId: z.string().describe('Numeric AllTrails trail id'),
+        trailId: numericId('Numeric AllTrails trail id'),
       }),
     },
     async (args) => {
