@@ -11,6 +11,8 @@ import {
   summarizeFeedItem,
   summarizeListItem,
   summarizeLocation,
+  summarizeProfile,
+  summarizeUserList,
 } from '../../src/tools/_shared.js';
 
 afterEach(() => {
@@ -356,6 +358,15 @@ describe('summarizeFeedItem', () => {
     });
   });
 
+  it('strips a hostile `<` flood in linear time (fleet-audit#1207)', () => {
+    // A tag opener with no closer used to restart a `[^>]*` scan per `<`
+    // (O(n²): 200 KB took ~15 s). The linear scan finishes in milliseconds.
+    const flood = '<'.repeat(400_000);
+    const started = performance.now();
+    summarizeFeedItem({ itemType: 'activity:created', description: flood });
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
   it('decodes html entities left behind after stripping tags', () => {
     const s = summarizeFeedItem({
       itemType: 'activity:created',
@@ -526,5 +537,26 @@ describe('resolveUserId id validation', () => {
   it('rejects a non-numeric id returned by /me', async () => {
     const c = clientReturning({ users: [{ id: '..' }] });
     await expect(resolveUserId(c)).rejects.toThrow(/non-numeric user id/);
+  });
+});
+
+describe('per-user projections tolerate sparse records', () => {
+  it('summarizeProfile drops null/missing fields', () => {
+    expect(summarizeProfile({})).toEqual({});
+    expect(
+      summarizeProfile({ id: 'x', username: null, slug: null, firstName: null, lastName: null, location: null, isPro: null }),
+    ).toEqual({ id: 'x' });
+    expect(summarizeProfile({ location: { city: null, region: 'NC', country: null } })).toEqual({
+      location: { region: 'NC' },
+    });
+    expect(summarizeProfile({ location: { city: 'Boone', region: null, country: 'US' } })).toEqual({
+      location: { city: 'Boone', country: 'US' },
+    });
+  });
+
+  it('summarizeUserList drops null/missing fields and prefers listItemsCount', () => {
+    expect(summarizeUserList({})).toEqual({});
+    expect(summarizeUserList({ id: 3, name: null, listItemsCount: null, itemCount: null, visibility: null })).toEqual({ id: '3' });
+    expect(summarizeUserList({ listItemsCount: 1, itemCount: 9 })).toEqual({ itemCount: 1 });
   });
 });

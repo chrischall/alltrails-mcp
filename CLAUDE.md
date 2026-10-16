@@ -27,7 +27,7 @@ src/
   validate.ts       parseAllTrails(): zod validation of AllTrails responses at call sites (lenient reads / strict where a mistype must halt)
   gpx.ts            decodePolyline() (generalized Google polyline varint decoder) + trailToGpx() (offline-detail route geometry → GPX 1.1) + OfflineTrailSchema
   tools/
-    _shared.ts      response helpers + resolveUserId (arg → ALLTRAILS_USER_ID → /api/alltrails/me users[0].id) + the compact projections, applied BY DEFAULT via the fleet `view` param (summarizeTrail/TrailDetail/Review/Photo/SearchResult/FeedItem/ListItem/Location + their loose schemas + ALLTRAILS_VIEWS)
+    _shared.ts      response helpers + resolveUserId (arg → ALLTRAILS_USER_ID → /api/alltrails/me users[0].id) + the compact projections, applied BY DEFAULT via the fleet `view` param (summarizeTrail/TrailDetail/Review/Photo/SearchResult/FeedItem/ListItem/Location/Profile/UserList + their loose schemas + ALLTRAILS_VIEWS)
     trails.ts       get_trail, get_trail_reviews, get_trail_photos, get_trail_weather, get_trail_gpx
     explore.ts      search, resolve_location (suggestions → place records: kind/coords/slug)
     user.ts         get_profile, list_user_lists, get_list_items (GET /lists/{id}/items — sparse trailId refs), list_completed_trails, get_activity_feed (feed?: local|timeline|personal follows the actual feed; omitted → directory)

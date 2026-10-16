@@ -104,6 +104,9 @@ describe('empty response body', () => {
     ['alltrails_search', {}],
     ['alltrails_resolve_location', { query: 'x' }],
     ['alltrails_get_list_items', { listId: '1' }],
+    ['alltrails_get_profile', {}],
+    ['alltrails_list_user_lists', { userId: '1' }],
+    ['alltrails_list_completed_trails', { userId: '1' }],
     ['alltrails_get_activity_feed', { userId: '1' }],
     ['alltrails_get_activity_feed', { userId: '1', feed: 'personal' }],
   ])('%s %j passes an empty body through instead of throwing', async (tool, args) => {

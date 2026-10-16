@@ -24,12 +24,51 @@ afterEach(() => {
 });
 
 describe('alltrails_get_profile', () => {
-  it('GETs /api/alltrails/me', async () => {
-    const me = { user: { id: 1, name: 'Chris' } };
+  const me = {
+    users: [
+      {
+        id: 1,
+        username: 'chris',
+        slug: 'members/chris',
+        firstName: 'Chris',
+        lastName: 'Hall',
+        email: 'private@example.com',
+        settings: { units: 'imperial', marketingOptIn: false },
+        location: { city: 'Charlotte', region: 'NC', country: 'US' },
+        isPro: true,
+      },
+    ],
+  };
+
+  it('GETs /api/alltrails/me and projects BY DEFAULT to identity fields only', async () => {
     const { client, handlers } = setup(me);
     const result = await handlers.get('alltrails_get_profile')!({});
     expect(client.request).toHaveBeenCalledWith('GET', '/api/alltrails/me');
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      id: '1',
+      username: 'chris',
+      slug: 'members/chris',
+      firstName: 'Chris',
+      lastName: 'Hall',
+      location: { city: 'Charlotte', region: 'NC', country: 'US' },
+      isPro: true,
+    });
+    // No email, no settings blob in the default shape.
+    expect(result.content[0].text).not.toContain('private@example.com');
+    expect(result.content[0].text).not.toContain('marketingOptIn');
+  });
+
+  it('returns the whole /me payload with view:"full"', async () => {
+    const { handlers } = setup(me);
+    const result = await handlers.get('alltrails_get_profile')!({ view: 'full' });
     expect(JSON.parse(result.content[0].text)).toEqual(me);
+  });
+
+  it('falls back to raw when the envelope drifted', async () => {
+    const drifted = { user: { id: 1, name: 'Chris' } };
+    const { handlers } = setup(drifted);
+    const result = await handlers.get('alltrails_get_profile')!({});
+    expect(JSON.parse(result.content[0].text)).toEqual(drifted);
   });
 });
 
@@ -46,6 +85,40 @@ describe('alltrails_list_user_lists', () => {
     await handlers.get('alltrails_list_user_lists')!({});
     expect(client.request).toHaveBeenNthCalledWith(1, 'GET', '/api/alltrails/me');
     expect(client.request).toHaveBeenNthCalledWith(2, 'GET', '/api/alltrails/users/42/lists');
+  });
+});
+
+describe('alltrails_list_user_lists views', () => {
+  const raw = {
+    lists: [
+      { id: 11, name: 'Favorites', description: null, listItemsCount: 4, visibility: 'private', metadata: { created: '2020-01-01T00:00:00Z' }, user: { id: 42, bio: 'long' } },
+      { id: 12, name: 'Zion', itemCount: 2 },
+    ],
+  };
+
+  it('projects BY DEFAULT to { count, lists: [{ id, name, itemCount, visibility }] }', async () => {
+    const { handlers } = setup(raw);
+    const result = await handlers.get('alltrails_list_user_lists')!({ userId: '42' });
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      count: 2,
+      lists: [
+        { id: '11', name: 'Favorites', itemCount: 4, visibility: 'private' },
+        { id: '12', name: 'Zion', itemCount: 2 },
+      ],
+    });
+  });
+
+  it('returns the raw payload with view:"full"', async () => {
+    const { handlers } = setup(raw);
+    const result = await handlers.get('alltrails_list_user_lists')!({ userId: '42', view: 'full' });
+    expect(JSON.parse(result.content[0].text)).toEqual(raw);
+  });
+
+  it('falls back to raw when the envelope drifted', async () => {
+    const drifted = { savedLists: [{ id: 1 }] };
+    const { handlers } = setup(drifted);
+    const result = await handlers.get('alltrails_list_user_lists')!({ userId: '42' });
+    expect(JSON.parse(result.content[0].text)).toEqual(drifted);
   });
 });
 
@@ -99,6 +172,48 @@ describe('alltrails_list_completed_trails', () => {
     const { client, handlers } = setup({ trails: [] });
     await handlers.get('alltrails_list_completed_trails')!({});
     expect(client.request).toHaveBeenCalledWith('GET', '/api/alltrails/users/333/trails/completed');
+  });
+});
+
+describe('alltrails_list_completed_trails views', () => {
+  const raw = {
+    trails: [
+      { ID: 10236086, name: 'Angels Landing', slug: 'us/utah/angels-landing', length: 7081.5, elevation_gain: 487.7, difficulty_rating: 5, avg_rating: 4.9, num_reviews: 100, area_name: 'Zion', state_name: 'Utah', overview: 'a very long overview', defaultMap: { routes: [] } },
+    ],
+  };
+
+  it('projects BY DEFAULT through the listing-trail summary', async () => {
+    const { handlers } = setup(raw);
+    const result = await handlers.get('alltrails_list_completed_trails')!({ userId: '42' });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.count).toBe(1);
+    expect(parsed.trails[0]).toEqual({
+      id: '10236086',
+      name: 'Angels Landing',
+      slug: 'us/utah/angels-landing',
+      lengthMeters: 7081.5,
+      lengthMiles: 4.4,
+      elevationGainMeters: 487.7,
+      elevationGainFeet: 1600,
+      difficulty: 5,
+      rating: 4.9,
+      numReviews: 100,
+      area: 'Zion',
+      region: 'Utah',
+    });
+  });
+
+  it('returns the raw payload with view:"full"', async () => {
+    const { handlers } = setup(raw);
+    const result = await handlers.get('alltrails_list_completed_trails')!({ userId: '42', view: 'full' });
+    expect(JSON.parse(result.content[0].text)).toEqual(raw);
+  });
+
+  it('falls back to raw when the envelope drifted', async () => {
+    const drifted = { completed: [] };
+    const { handlers } = setup(drifted);
+    const result = await handlers.get('alltrails_list_completed_trails')!({ userId: '42' });
+    expect(JSON.parse(result.content[0].text)).toEqual(drifted);
   });
 });
 

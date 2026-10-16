@@ -46,6 +46,9 @@ const VIEW_TOOLS: Array<[label: string, tool: string, args: Record<string, unkno
   ['search (query)', 'alltrails_search', { query: 'zion' }],
   ['search (no-query fallback)', 'alltrails_search', { lat: 1, lng: 2 }],
   ['get_list_items', 'alltrails_get_list_items', { listId: '5' }],
+  ['get_profile', 'alltrails_get_profile', {}],
+  ['list_user_lists', 'alltrails_list_user_lists', { userId: '9' }],
+  ['list_completed_trails', 'alltrails_list_completed_trails', { userId: '9' }],
   ['get_activity_feed (directory)', 'alltrails_get_activity_feed', { userId: '9' }],
   ['get_activity_feed (feed)', 'alltrails_get_activity_feed', { userId: '9', feed: 'personal', maxItems: 5, cursor: 'c' }],
 ];

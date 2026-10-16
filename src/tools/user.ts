@@ -5,7 +5,10 @@ import type { AllTrailsClient } from '../client.js';
 import { parseAllTrails } from '../validate.js';
 import {
   ALLTRAILS_VIEWS,
+  CompletedTrailsSchema,
+  ProfileSchema,
   READ_ONLY_ANNOTATIONS,
+  UserListsSchema,
   FeedDirectorySchema,
   FeedPageSchema,
   ListItemsSchema,
@@ -14,6 +17,9 @@ import {
   resolveUserId,
   summarizeFeedItem,
   summarizeListItem,
+  summarizeProfile,
+  summarizeTrail,
+  summarizeUserList,
 } from './_shared.js';
 
 // Per-user read tools. These require a signed-in session (the captured browser
@@ -25,12 +31,23 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
     {
       title: 'Get AllTrails profile',
       description:
-        'Get the signed-in AllTrails user profile (via /api/alltrails/me). Requires a signed-in session.',
+        'Get the signed-in AllTrails user profile (via /api/alltrails/me). Requires a signed-in session. ' +
+        'Returns identity fields { id, username, slug, firstName, lastName, location, isPro } by default; pass view:"full" for the whole record (includes email and account settings).',
       annotations: READ_ONLY_ANNOTATIONS,
+      inputSchema: z.object({
+        view: viewParam(ALLTRAILS_VIEWS, {
+          note: 'compact returns the identity fields only; "full" returns AllTrails\' whole /me payload, including email and settings.',
+        }),
+      }),
     },
-    async () => {
-      const data = await client.request('GET', '/api/alltrails/me');
-      return jsonResponse(data);
+    async (args) => {
+      const raw = await client.request('GET', '/api/alltrails/me');
+      if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
+        const parsed = parseAllTrails(ProfileSchema, raw, 'GET /api/alltrails/me');
+        const user = Array.isArray(parsed?.users) ? parsed.users[0] : undefined;
+        if (user) return jsonResponse(summarizeProfile(user));
+      }
+      return jsonResponse(raw);
     },
   );
 
@@ -40,19 +57,30 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
       title: 'List AllTrails user lists',
       description:
         "List an AllTrails user's saved lists (favorites, custom lists). Defaults to the signed-in user; " +
-        'pass a userId to target a specific public profile.',
+        'pass a userId to target a specific public profile. Returns slim { id, name, itemCount, visibility } entries by default ' +
+        '(feed an id to alltrails_get_list_items); pass view:"full" for the whole records.',
       annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
+        view: viewParam(ALLTRAILS_VIEWS, {
+          note: 'compact returns { count, lists: [{ id, name, itemCount, visibility }] }; "full" returns AllTrails\' whole list records.',
+        }),
       }),
     },
     async (args) => {
       const userId = await resolveUserId(client, args.userId);
-      const data = await client.request(
+      const raw = await client.request(
         'GET',
         `/api/alltrails/users/${encodeURIComponent(userId)}/lists`,
       );
-      return jsonResponse(data);
+      if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
+        const parsed = parseAllTrails(UserListsSchema, raw, 'GET /api/alltrails/users/{id}/lists');
+        if (Array.isArray(parsed?.lists)) {
+          const lists = parsed.lists.map(summarizeUserList);
+          return jsonResponse({ count: lists.length, lists });
+        }
+      }
+      return jsonResponse(raw);
     },
   );
 
@@ -97,19 +125,30 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
       title: 'List AllTrails completed trails',
       description:
         'List the trails an AllTrails user has marked completed. Defaults to the signed-in user; pass a userId ' +
-        'to target a specific public profile.',
+        'to target a specific public profile. Returns slim trail summaries (name, length, elevation, difficulty, rating) by default; ' +
+        'pass view:"full" for the whole records.',
       annotations: READ_ONLY_ANNOTATIONS,
       inputSchema: z.object({
         userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
+        view: viewParam(ALLTRAILS_VIEWS, {
+          note: 'compact returns { count, trails: [...] } in the same slim shape as alltrails_search trails; "full" returns AllTrails\' whole trail records.',
+        }),
       }),
     },
     async (args) => {
       const userId = await resolveUserId(client, args.userId);
-      const data = await client.request(
+      const raw = await client.request(
         'GET',
         `/api/alltrails/users/${encodeURIComponent(userId)}/trails/completed`,
       );
-      return jsonResponse(data);
+      if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
+        const parsed = parseAllTrails(CompletedTrailsSchema, raw, 'GET /api/alltrails/users/{id}/trails/completed');
+        if (Array.isArray(parsed?.trails)) {
+          const trails = parsed.trails.map(summarizeTrail);
+          return jsonResponse({ count: trails.length, trails });
+        }
+      }
+      return jsonResponse(raw);
     },
   );
 

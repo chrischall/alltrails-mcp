@@ -1,5 +1,5 @@
 import { minifiedResult, pruneUndefined, rawTextResult } from '@chrischall/mcp-utils';
-import { decodeHtmlEntities } from '@chrischall/mcp-utils/scrape';
+import { stripHtml } from '@chrischall/mcp-utils/scrape';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
 import { getConfiguredUserId } from '../config.js';
@@ -268,20 +268,6 @@ export function summarizeReview(raw: z.infer<typeof RawReviewSchema>): ReviewSum
 function prune<T extends Record<string, unknown>>(obj: T): Partial<T> | undefined {
   const pruned = pruneUndefined(obj);
   return Object.keys(pruned).length > 0 ? pruned : undefined;
-}
-
-/**
- * Strip HTML tags (the feed wraps trail names in anchors), decode the entities
- * the markup leaves behind via mcp-utils' `decodeHtmlEntities` (numeric +
- * `&nbsp;/&lt;/&gt;/&quot;/&apos;`, with `&amp;` last so `&amp;lt;` → `&lt;`),
- * and collapse whitespace. Tags are removed with no separator — unlike scrape's
- * `stripHtml`, which inserts a space — to preserve this repo's feed-description
- * output exactly.
- */
-function stripHtml(s: string): string {
-  return decodeHtmlEntities(s.replace(/<[^>]*>/g, ''))
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 /** Return a trimmed string, or undefined when it is null/empty/whitespace. */
@@ -566,6 +552,9 @@ export function summarizeFeedItem(raw: RawFeedItemData): FeedItemSummary {
   return {
     type: raw.itemType ?? undefined,
     timestamp: raw.timestamp ?? undefined,
+    // Feed descriptions wrap trail names in anchors. mcp-utils' stripHtml is a
+    // linear tag scan (fleet-audit#1207) that also decodes entities and
+    // collapses whitespace.
     description: raw.description ? nonEmpty(stripHtml(raw.description)) : undefined,
     user: user || undefined,
     trail,
@@ -614,3 +603,88 @@ export function summarizeListItem(raw: RawListItem): ListItemSummary {
     addedAt: raw.metadata?.created ?? undefined,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Per-user reads: profile, saved lists, completed trails (fleet-audit#1208)
+// ---------------------------------------------------------------------------
+
+const IdValue = z.union([z.number(), z.string()]);
+
+// `/me` user record. Only the identity fields the compact profile keeps are
+// declared; email, settings and the rest pass through to view:"full" only.
+const RawProfileSchema = z.looseObject({
+  id: IdValue.optional(),
+  username: z.string().nullish(),
+  slug: z.string().nullish(),
+  firstName: z.string().nullish(),
+  lastName: z.string().nullish(),
+  location: z
+    .looseObject({
+      city: z.string().nullish(),
+      region: z.string().nullish(),
+      country: z.string().nullish(),
+    })
+    .nullish(),
+  isPro: z.boolean().nullish(),
+});
+export const ProfileSchema = z.looseObject({ users: z.array(RawProfileSchema).optional() });
+
+export interface ProfileSummary {
+  id?: string;
+  username?: string;
+  slug?: string;
+  firstName?: string;
+  lastName?: string;
+  location?: { city?: string; region?: string; country?: string };
+  isPro?: boolean;
+}
+
+/** Project the signed-in user to identity fields (no email, no settings). */
+export function summarizeProfile(raw: z.infer<typeof RawProfileSchema>): ProfileSummary {
+  return {
+    id: raw.id === undefined ? undefined : `${raw.id}`,
+    username: raw.username ?? undefined,
+    slug: raw.slug ?? undefined,
+    firstName: raw.firstName ?? undefined,
+    lastName: raw.lastName ?? undefined,
+    location: raw.location
+      ? prune({
+          city: raw.location.city ?? undefined,
+          region: raw.location.region ?? undefined,
+          country: raw.location.country ?? undefined,
+        })
+      : undefined,
+    isPro: raw.isPro ?? undefined,
+  };
+}
+
+// `/users/{id}/lists` record. The item count has been seen under more than
+// one name, so all are read and the first present wins.
+const RawUserListSchema = z.looseObject({
+  id: IdValue.optional(),
+  name: z.string().nullish(),
+  listItemsCount: z.number().nullish(),
+  itemCount: z.number().nullish(),
+  visibility: z.string().nullish(),
+});
+export const UserListsSchema = z.looseObject({ lists: z.array(RawUserListSchema).optional() });
+
+export interface UserListSummary {
+  /** Feed to alltrails_get_list_items. */
+  id?: string;
+  name?: string;
+  itemCount?: number;
+  visibility?: string;
+}
+
+export function summarizeUserList(raw: z.infer<typeof RawUserListSchema>): UserListSummary {
+  return {
+    id: raw.id === undefined ? undefined : `${raw.id}`,
+    name: raw.name ?? undefined,
+    itemCount: raw.listItemsCount ?? raw.itemCount ?? undefined,
+    visibility: raw.visibility ?? undefined,
+  };
+}
+
+// `/users/{id}/trails/completed` uses the listing `{ trails: [...] }` envelope.
+export const CompletedTrailsSchema = z.looseObject({ trails: z.array(RawTrailSchema).optional() });
