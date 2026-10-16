@@ -68,7 +68,7 @@ describe('getRequestTimeoutMs', () => {
     process.env.ALLTRAILS_REQUEST_TIMEOUT_MS = '5000';
     expect(getRequestTimeoutMs()).toBe(5000);
   });
-  it.each(['not-a-number', '0', '-5', '   ', ''])('falls back to default for invalid %j', (v) => {
+  it.each(['not-a-number', '0', '-5', '   ', '', '2.5', '1e3', '${user_config.timeout}', 'undefined'])('falls back to default for invalid %j', (v) => {
     process.env.ALLTRAILS_REQUEST_TIMEOUT_MS = v;
     expect(getRequestTimeoutMs()).toBe(30_000);
   });

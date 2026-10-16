@@ -1,4 +1,4 @@
-import { parseBoolEnv as parseBoolEnvUtil, readEnvVar, readPortEnv } from '@chrischall/mcp-utils';
+import { parseBoolEnv as parseBoolEnvUtil, readEnvVar, readIntEnv, readPortEnv } from '@chrischall/mcp-utils';
 import { DEFAULT_CALLER, DEFAULT_LOCALE } from './protocol.js';
 
 /**
@@ -38,10 +38,10 @@ export function getConfiguredUserId(): string | undefined {
 // instead of burning the MCP client-side budget.
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 export function getRequestTimeoutMs(): number {
-  const raw = process.env.ALLTRAILS_REQUEST_TIMEOUT_MS;
-  if (typeof raw !== 'string' || raw.trim().length === 0) return DEFAULT_REQUEST_TIMEOUT_MS;
-  const n = Number(raw.trim());
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_REQUEST_TIMEOUT_MS;
+  return (
+    readIntEnv('ALLTRAILS_REQUEST_TIMEOUT_MS', { min: 1 }) ??
+    DEFAULT_REQUEST_TIMEOUT_MS
+  );
 }
 
 // The fetchproxy concentrator port. The whole fleet (and the ContextMint Bridge
