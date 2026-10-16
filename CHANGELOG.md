@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.9](https://github.com/chrischall/alltrails-mcp/compare/v3.1.8...v3.1.9) (2026-10-16)
+
+
+### Bug Fixes
+
+* **deps:** Bump the production-dependencies group with 5 updates ([#162](https://github.com/chrischall/alltrails-mcp/issues/162)) ([8ed7ae1](https://github.com/chrischall/alltrails-mcp/commit/8ed7ae1450eb6743570d41fa0e9c932c3364216d))
+* **tools:** strip feed HTML in linear time; compact view for profile, lists and completed trails ([#165](https://github.com/chrischall/alltrails-mcp/issues/165)) ([8afac0e](https://github.com/chrischall/alltrails-mcp/commit/8afac0e6410f41175aeb09cd5dd30db5b2e1194c))
+
 ## [3.1.8](https://github.com/chrischall/alltrails-mcp/compare/v3.1.7...v3.1.8) (2026-10-09)
 
 
