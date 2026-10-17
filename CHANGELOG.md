@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.10](https://github.com/chrischall/alltrails-mcp/compare/v3.1.9...v3.1.10) (2026-10-17)
+
+
+### Refactor
+
+* **client:** start the bridge with mcp-utils createLazyTransport ([#168](https://github.com/chrischall/alltrails-mcp/issues/168)) ([73487de](https://github.com/chrischall/alltrails-mcp/commit/73487de1572db15d0e9e587e5d2fa33ce0a55866))
+
 ## [3.1.9](https://github.com/chrischall/alltrails-mcp/compare/v3.1.8...v3.1.9) (2026-10-16)
 
 
