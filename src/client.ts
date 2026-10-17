@@ -19,7 +19,7 @@
 // silent probe (see ROTATION_PROBE_TIMEOUT_MS) rather than the full capture.
 
 import { loadDotenvSafely, messageOf, redactSecrets } from '@chrischall/mcp-utils';
-import { bridgeErrorInfo, type FetchproxyTransport } from '@chrischall/mcp-utils/fetchproxy';
+import { bridgeErrorInfo, createLazyTransport, type FetchproxyTransport } from '@chrischall/mcp-utils/fetchproxy';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { createAllTrailsTransport } from './transport.js';
@@ -89,8 +89,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 export class AllTrailsClient {
-  private transport: FetchproxyTransport | undefined;
-  private startPromise: Promise<void> | undefined;
+  /**
+   * The bridge transport, built lazily and started once
+   * (`@chrischall/mcp-utils/fetchproxy` `createLazyTransport`,
+   * fleet-audit#1342). `start()` loads the identity keypair and must precede
+   * the first verb call; concurrent callers share one start, and a rejected
+   * start is forgotten so a transient failure (e.g. an unwritable identity
+   * dir) is retried on the next request instead of sticking forever.
+   */
+  private readonly lazy = createLazyTransport<FetchproxyTransport>(
+    () => this.injected.transport ?? createAllTrailsTransport(),
+  );
   private apiKey: string | undefined;
   private apiKeyPromise: Promise<string> | undefined;
 
@@ -102,29 +111,12 @@ export class AllTrailsClient {
    * probe/report bridge state without re-creating it.
    */
   bridge(): FetchproxyTransport {
-    if (!this.transport) {
-      this.transport = this.injected.transport ?? createAllTrailsTransport();
-    }
-    return this.transport;
+    return this.lazy.transport();
   }
 
-  /**
-   * The bridge transport, started. `start()` loads the identity keypair and
-   * must precede the first verb call; it runs single-flight (concurrent
-   * callers share one start) and clears on rejection so a transient failure
-   * (e.g. an unwritable identity dir) is retried on the next request instead
-   * of sticking forever.
-   */
-  async bridgeReady(): Promise<FetchproxyTransport> {
-    const transport = this.bridge();
-    if (!this.startPromise) {
-      this.startPromise = transport.start().catch((e: unknown) => {
-        this.startPromise = undefined;
-        throw e;
-      });
-    }
-    await this.startPromise;
-    return transport;
+  /** The bridge transport, started (single-flight; cleared on rejection). */
+  bridgeReady(): Promise<FetchproxyTransport> {
+    return this.lazy.ready();
   }
 
   /**
