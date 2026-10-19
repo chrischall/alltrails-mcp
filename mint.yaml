@@ -8,6 +8,18 @@ summary: >-
   `bridgePortEnv: ALLTRAILS_WS_PORT` — none of which this manifest can express
   (they are registration fields, set over the control API). dataDir below is
   required for bridge and is why it is declared.
+examples:
+  - prompt: >-
+      Look up Angels Landing on AllTrails: how long is it, how much elevation
+      gain, and what's the difficulty rating?
+    note: Searches by trail name, then reads the trail's details.
+  - prompt: >-
+      Summarize the most recent AllTrails reviews for the Mist Trail in
+      Yosemite. Any mentions of closures or slippery conditions?
+  - prompt: >-
+      Which trails have I marked completed on AllTrails, and what's on my saved
+      lists?
+    note: Needs your signed-in alltrails.com tab via the browser bridge.
 env:
   - name: ALLTRAILS_WS_PORT
     required: false
