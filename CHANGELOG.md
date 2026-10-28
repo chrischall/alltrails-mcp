@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.1.11](https://github.com/chrischall/alltrails-mcp/compare/v3.1.10...v3.1.11) (2026-10-21)
+
+
+### Bug Fixes
+
+* **deps:** Bump the production-dependencies group with 2 updates ([#176](https://github.com/chrischall/alltrails-mcp/issues/176)) ([f3d69a9](https://github.com/chrischall/alltrails-mcp/commit/f3d69a9a0614326a0b32a87c13fcdcfb30806eca))
+* **deps:** Bump vite ([#174](https://github.com/chrischall/alltrails-mcp/issues/174)) ([9e73b30](https://github.com/chrischall/alltrails-mcp/commit/9e73b30f60574f346f171e4c699dcf16b2e02457))
+
+
+### Documentation
+
+* **mint:** add sample prompts for the public catalog ([#171](https://github.com/chrischall/alltrails-mcp/issues/171)) ([cb31559](https://github.com/chrischall/alltrails-mcp/commit/cb31559ae43c10b0d9751e16ad45190738ca2381))
+* **mint:** fit the catalog summary within 200 characters ([#173](https://github.com/chrischall/alltrails-mcp/issues/173)) ([cde212c](https://github.com/chrischall/alltrails-mcp/commit/cde212caf07f18ae27310911db392454df0016f2))
+
 ## [3.1.10](https://github.com/chrischall/alltrails-mcp/compare/v3.1.9...v3.1.10) (2026-10-17)
 
 
