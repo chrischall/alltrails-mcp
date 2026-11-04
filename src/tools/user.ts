@@ -1,4 +1,4 @@
-import { resolveView, viewParam } from '@chrischall/mcp-utils';
+import { resolveView, UNTRUSTED_CONTENT_RULE, untrustedEnvelope, viewParam } from '@chrischall/mcp-utils';
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { AllTrailsClient } from '../client.js';
@@ -6,8 +6,8 @@ import { parseAllTrails } from '../validate.js';
 import {
   ALLTRAILS_VIEWS,
   CompletedTrailsSchema,
-  briefFeedLine,
-  textResponse,
+  briefFeedLines,
+  FEED_BRIEF_AUTHORS,
   ProfileSchema,
   READ_ONLY_ANNOTATIONS,
   UserListsSchema,
@@ -198,7 +198,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         view: z
           .enum(FEED_VIEWS)
           .describe(
-            'Response shape. "compact" (default) returns { count, hasNextPage, nextCursor, items: [{ type, timestamp, description, user, trail, activity, review }] } — and the no-feed directory as { name, displayName } per feed; "full" returns AllTrails\' whole records; "brief" returns one line per item, "who: what — <ISO date or no date> — <recorded|reviewed|…>", and reads the timeline (people you follow) when no feed is named.',
+            'Response shape. "compact" (default) returns { count, hasNextPage, nextCursor, items: [{ type, timestamp, description, user, trail, activity, review }] } — and the no-feed directory as { name, displayName } per feed; "full" returns AllTrails\' whole records; "brief" returns one line per item, "who: what — <ISO date or no date> — <recorded|reviewed|…>", inside the untrusted-data envelope as data: string[], with "-- none" / "-- more" note lines for an empty page or another page, and reads the timeline (people you follow) when no feed is named.',
           )
           .optional(),
       }),
@@ -232,10 +232,9 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
       const raw = await client.request('GET', `${base}/${feed}${qs}`);
       if (brief) {
         const parsed = parseAllTrails(FeedPageSchema, raw, 'GET .../feeds/{feed}');
-        const lines = (parsed?.sections ?? [])
-          .filter((s) => s.itemData !== undefined && s.itemData !== null)
-          .map((s) => briefFeedLine(s.itemData!));
-        return textResponse(lines.length > 0 ? lines.join('\n') : 'No new activity.');
+        return jsonResponse(
+          untrustedEnvelope(briefFeedLines(parsed), { note: `${FEED_BRIEF_AUTHORS} ${UNTRUSTED_CONTENT_RULE}` }),
+        );
       }
       if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
         const parsed = parseAllTrails(FeedPageSchema, raw, 'GET .../feeds/{feed}');

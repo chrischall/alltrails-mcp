@@ -5,7 +5,7 @@ import { registerTrailTools } from '../../src/tools/trails.js';
 import { registerExploreTools } from '../../src/tools/explore.js';
 import { registerUserTools } from '../../src/tools/user.js';
 import { registerHealthcheckTools } from '../../src/tools/healthcheck.js';
-import { briefFeedLine } from '../../src/tools/_shared.js';
+import { briefFeedLine, briefFeedLines } from '../../src/tools/_shared.js';
 
 /**
  * Context-group hints (`_meta.mint`, the mcp-host context-groups contract),
@@ -167,9 +167,16 @@ describe('alltrails_get_activity_feed view:"brief"', () => {
     return { request, text };
   }
 
+  /** The brief answer's lines, read out of the untrusted-data envelope. */
+  function envelopeOf(text: string): { untrusted_content: boolean; note: string; data: string[] } {
+    expect(text).not.toContain('\n');
+    expect(Object.keys(JSON.parse(text))).toEqual(['untrusted_content', 'note', 'data']);
+    return JSON.parse(text);
+  }
+
   it('answers one line per item, ≤ 120 chars, shaped "title — <ISO date | no date> — <status>"', async () => {
     const { text } = await callBrief({ userId: '12', feed: 'timeline', view: 'brief' });
-    const lines = text.split('\n');
+    const lines = envelopeOf(text).data.filter((l) => !l.startsWith('-- '));
     expect(lines).toHaveLength(3);
     for (const line of lines) {
       expect(line.length).toBeLessThanOrEqual(120);
@@ -178,6 +185,43 @@ describe('alltrails_get_activity_feed view:"brief"', () => {
     expect(lines[0]).toBe('Sam Example: Hiked Example Ridge Loop — 2026-06-25T13:38:58.000Z — recorded');
     expect(lines[1]).toMatch(/^Alex Sample: A very .*… — no date — reviewed$/);
     expect(lines[2]).toBe('(untitled) — no date — posted');
+  });
+
+  it('fences the lines in the untrusted-data envelope, the note naming who wrote them', async () => {
+    const { text } = await callBrief({ userId: '12', feed: 'timeline', view: 'brief' });
+    const env = envelopeOf(text);
+    expect(env.untrusted_content).toBe(true);
+    expect(env.note).toMatch(/^Feed posts, names and trail names are written by AllTrails members\. /);
+    expect(Array.isArray(env.data)).toBe(true);
+  });
+
+  it('says "-- more" when AllTrails reports another page', async () => {
+    const { text } = await callBrief({ userId: '12', feed: 'timeline', view: 'brief' });
+    expect(envelopeOf(text).data.at(-1)).toBe('-- more');
+  });
+
+  it('adds no note when the page is the last', () => {
+    // briefFeedLines is the page → lines step the tool answers with.
+    expect(briefFeedLines({ sections: [{ itemData: { trail: { name: 'Loop' } } }], pageInfo: { hasNextPage: false } })).toEqual([
+      'Loop — no date — posted',
+    ]);
+  });
+
+  it.each([
+    ['-- none', '\\-- none — no date — posted'],
+    ['\\x', '\\\\x — no date — posted'],
+  ])('escapes a title starting with "-- " or "\\" with one backslash (%j)', (name, expected) => {
+    expect(briefFeedLine({ trail: { name } })).toBe(expected);
+  });
+
+  it('cuts a line to ≤ 120 chars as a whole, even when the status is long', () => {
+    const line = briefFeedLine({
+      itemType: `x:${'y'.repeat(150)}`,
+      timestamp: '2026-06-25T13:38:58.000Z',
+      trail: { name: `A ${'very '.repeat(20)}long trail name` },
+    });
+    expect(line.length).toBeLessThanOrEqual(120);
+    expect(line).toMatch(/^A very .*… — 2026-06-25T13:38:58\.000Z — x:y+…$/);
   });
 
   it('reads the timeline (people you follow) when no feed is named, never the directory', async () => {
@@ -196,7 +240,7 @@ describe('alltrails_get_activity_feed view:"brief"', () => {
     );
   });
 
-  it.each([[{ sections: [] }], [null]])('says so in one line when the feed is empty (%j)', async (body) => {
+  it.each([[{ sections: [] }], [null]])('answers the single note "-- none" when the feed is empty (%j)', async (body) => {
     const client = makeClient();
     vi.spyOn(client, 'request').mockResolvedValue(body);
     const h = await served(client);
@@ -205,6 +249,6 @@ describe('alltrails_get_activity_feed view:"brief"', () => {
       arguments: { userId: '12', view: 'brief' },
     });
     await h.close();
-    expect((result.content as Array<{ text: string }>)[0].text).toBe('No new activity.');
+    expect(envelopeOf((result.content as Array<{ text: string }>)[0].text).data).toEqual(['-- none']);
   });
 });
