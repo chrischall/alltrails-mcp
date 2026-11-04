@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.2.0](https://github.com/chrischall/alltrails-mcp/compare/v3.1.11...v3.2.0) (2026-11-04)
+
+
+### Features
+
+* context-group hints, a brief view on the activity feed ([#182](https://github.com/chrischall/alltrails-mcp/issues/182)) ([9cad8dc](https://github.com/chrischall/alltrails-mcp/commit/9cad8dc84db01bd53f93b3351237b25acad2f69e))
+
+
+### Bug Fixes
+
+* **deps:** Bump the production-dependencies group with 4 updates ([#180](https://github.com/chrischall/alltrails-mcp/issues/180)) ([e34eec9](https://github.com/chrischall/alltrails-mcp/commit/e34eec9860ff455e001e8d57013bc6b64a9ccc30))
+
 ## [3.1.11](https://github.com/chrischall/alltrails-mcp/compare/v3.1.10...v3.1.11) (2026-10-21)
 
 
