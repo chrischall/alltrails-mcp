@@ -72,7 +72,7 @@ Full route geometry needs **both**: `detail: "offline"` to fetch it and
 | `alltrails_list_user_lists(userId?, view?)` | Saved lists / favorites as `{ count, lists: [{ id, name, itemCount, visibility }] }` by default. Defaults to the signed-in user. |
 | `alltrails_get_list_items(listId, view?)` | The trails saved in a list, by list id (from `list_user_lists`, or a public `list` record from `search`). Items are **sparse references** — each is `{ trailId, type, order, notes, addedAt }`; hydrate details with `get_trail`. By default the items are projected to those five fields and sorted by the curator's `order`; `view: "full"` returns the whole records, in the order AllTrails sent them. |
 | `alltrails_list_completed_trails(userId?, view?)` | Trails marked completed, as `{ count, trails }` in the slim search-trail shape by default. Defaults to the signed-in user. |
-| `alltrails_get_activity_feed(userId?, feed?, maxItems?, cursor?, view?)` | Activity feed. Without `feed` it returns the feed **directory** (just `{ name, displayName }` per feed by default); pass `feed`: `local` (nearby activity) \| `timeline` (people you follow) \| `personal` (own posts) for the actual items. Paginate with `cursor` (from `nextCursor`). Items are projected to `{ type, timestamp, user, trail, activity stats, review }` by default; `view: "full"` returns AllTrails' whole records; `view: "brief"` returns one line per item (`who: what — <ISO date> — recorded/reviewed/…`) and reads `timeline` when no `feed` is named. |
+| `alltrails_get_activity_feed(userId?, feed?, maxItems?, cursor?, view?)` | Activity feed. Without `feed` it returns the feed **directory** (just `{ name, displayName }` per feed by default); pass `feed`: `local` (nearby activity) \| `timeline` (people you follow) \| `personal` (own posts) for the actual items. Paginate with `cursor` (from `nextCursor`). Items are projected to `{ type, timestamp, user, trail, activity stats, review }` by default; `view: "full"` returns AllTrails' whole records; `view: "brief"` returns one line per item (`who: what — <ISO date> — recorded/reviewed/…`) inside the untrusted-data envelope, with `-- none` / `-- more` notes, and reads `timeline` when no `feed` is named. |
 
 `userId` defaults to the signed-in user (resolved via `/api/alltrails/me`, or `ALLTRAILS_USER_ID`).
 
@@ -98,7 +98,10 @@ On a host with context groups (mcp-host), every AllTrails tool joins the
   `saved trails`, …) as aliases. There are no writes.
 - **A compound ask** looks like "anything new from my hiking friends, and
   what's on at the park this weekend?" — the group calls the feed in `brief`
-  beside the other travel members and merges the lines.
+  beside the other travel members and merges the lines. The brief lines
+  arrive inside the untrusted-data envelope (`data: string[]` — the feed is
+  written by other AllTrails members), with `-- none` for an empty feed and
+  `-- more` when AllTrails reports another page.
 - **Browser-bridged:** every call goes through the fetchproxy bridge, so when
   no signed-in alltrails.com tab (or the extension) is reachable the group
   answers that AllTrails **needs your browser open** rather than failing the

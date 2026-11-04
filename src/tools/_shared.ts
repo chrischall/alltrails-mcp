@@ -700,22 +700,49 @@ const FEED_STATUS: Record<string, string> = {
   'user:connected': 'followed',
 };
 
+const cut = (s: string, n: number): string => (s.length > n ? `${s.slice(0, Math.max(n - 1, 0))}…` : s);
+
+/** The shortest a title is cut to before the status gives way too. */
+const TITLE_FLOOR = 24;
+
 /**
  * One feed item as one line, `title — <ISO date | no date> — <status>`, at most
- * 120 characters (the title is shortened). The title is the actor and what
- * they did (`Sam Example: Hiked Example Ridge Loop`); the date is the item's
- * own ISO timestamp; the status says what kind of post it is, from AllTrails'
+ * 120 characters. The title is the actor and what they did
+ * (`Sam Example: Hiked Example Ridge Loop`); the date is the item's own ISO
+ * timestamp; the status says what kind of post it is, from AllTrails'
  * `itemType` (an unknown type is shown as AllTrails names it; none at all is
- * `posted`).
+ * `posted`). The line is cut as a WHOLE, title first: the title shortens until
+ * the line fits, and only once it is at its floor does a long status give way
+ * too. A title starting with `-- ` or `\` is escaped with one leading `\`, so
+ * it can never read as a note (mcp-host strips one backslash from each item).
  */
 export function briefFeedLine(raw: RawFeedItemData): string {
   const s = summarizeFeedItem(raw);
   const what = s.description ?? s.trail?.name ?? s.activity?.name ?? '(untitled)';
-  const title = s.user ? `${s.user}: ${what}` : what;
+  const rawTitle = s.user ? `${s.user}: ${what}` : what;
+  const title = rawTitle.startsWith('-- ') || rawTitle.startsWith('\\') ? `\\${rawTitle}` : rawTitle;
   const date = nonEmpty(s.timestamp) ?? 'no date';
   const status = s.type ? (FEED_STATUS[s.type] ?? s.type) : 'posted';
-  const tail = ` — ${date} — ${status}`;
-  const room = BRIEF_MAX - tail.length;
-  const shown = title.length > room ? `${title.slice(0, Math.max(room - 1, 0))}…` : title;
-  return `${shown}${tail}`;
+  const sep = ` — ${date} — `;
+  const room = BRIEF_MAX - sep.length;
+  if (title.length + status.length <= room) return `${title}${sep}${status}`;
+  const shown = cut(title, Math.max(room - status.length, Math.min(title.length, TITLE_FLOOR)));
+  return `${shown}${sep}${cut(status, room - shown.length)}`;
 }
+
+/**
+ * A feed page as brief lines plus its notes: `-- none` when it holds no item,
+ * and `-- more` when AllTrails reports another page (`pageInfo.hasNextPage`;
+ * the feed gives no total, so `-- N of M shown` cannot be said).
+ */
+export function briefFeedLines(page: z.infer<typeof FeedPageSchema> | undefined): string[] {
+  const lines = (page?.sections ?? [])
+    .filter((s) => s.itemData !== undefined && s.itemData !== null)
+    .map((s) => briefFeedLine(s.itemData!));
+  if (lines.length === 0) return ['-- none'];
+  if (page?.pageInfo?.hasNextPage === true) lines.push('-- more');
+  return lines;
+}
+
+/** Who writes the text on a brief feed line, the envelope note's first sentence. */
+export const FEED_BRIEF_AUTHORS = 'Feed posts, names and trail names are written by AllTrails members.';
