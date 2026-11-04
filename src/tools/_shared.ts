@@ -688,3 +688,34 @@ export function summarizeUserList(raw: z.infer<typeof RawUserListSchema>): UserL
 
 // `/users/{id}/trails/completed` uses the listing `{ trails: [...] }` envelope.
 export const CompletedTrailsSchema = z.looseObject({ trails: z.array(RawTrailSchema).optional() });
+
+const BRIEF_MAX = 120;
+
+/** What each known feed item type means, as a one-word status. */
+const FEED_STATUS: Record<string, string> = {
+  'activity:created': 'recorded',
+  'review:created': 'reviewed',
+  'photo:created': 'photo added',
+  'list:created': 'list created',
+  'user:connected': 'followed',
+};
+
+/**
+ * One feed item as one line, `title — <ISO date | no date> — <status>`, at most
+ * 120 characters (the title is shortened). The title is the actor and what
+ * they did (`Sam Example: Hiked Example Ridge Loop`); the date is the item's
+ * own ISO timestamp; the status says what kind of post it is, from AllTrails'
+ * `itemType` (an unknown type is shown as AllTrails names it; none at all is
+ * `posted`).
+ */
+export function briefFeedLine(raw: RawFeedItemData): string {
+  const s = summarizeFeedItem(raw);
+  const what = s.description ?? s.trail?.name ?? s.activity?.name ?? '(untitled)';
+  const title = s.user ? `${s.user}: ${what}` : what;
+  const date = nonEmpty(s.timestamp) ?? 'no date';
+  const status = s.type ? (FEED_STATUS[s.type] ?? s.type) : 'posted';
+  const tail = ` — ${date} — ${status}`;
+  const room = BRIEF_MAX - tail.length;
+  const shown = title.length > room ? `${title.slice(0, Math.max(room - 1, 0))}…` : title;
+  return `${shown}${tail}`;
+}

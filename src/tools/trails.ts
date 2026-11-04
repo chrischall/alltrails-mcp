@@ -17,6 +17,7 @@ import {
   summarizeTrailDetail,
   textResponse,
 } from './_shared.js';
+import { TRAIL_ALIASES, travelMeta } from './hints.js';
 import { parseAllTrails } from '../validate.js';
 
 // Trail-scoped read tools: detail, reviews, photos, weather. All read-only.
@@ -31,6 +32,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         'Returns a slim projection by default (name, overview, length in m+mi, elevation gain, difficulty, ' +
         'rating, route type, location); pass view:"full" for the whole record and geometry.',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup', { aliases: TRAIL_ALIASES }),
       inputSchema: z.object({
         trailId: numericId('Numeric AllTrails trail id (e.g. "10236086")'),
         detail: z
@@ -71,6 +73,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         'Get user reviews for an AllTrails trail by its numeric trail id. Returns just ' +
         '{ user, rating, comment } per review by default; pass view:"full" for the whole records.',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup', { aliases: ['reviews', 'trail conditions', 'ratings'] }),
       inputSchema: z.object({
         trailId: numericId('Numeric AllTrails trail id'),
         limit: z
@@ -116,6 +119,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         '{ id, title, likeCount, user, uploadedAt, url } per photo by default — the url serves the actual image; ' +
         'pass view:"full" for the whole records.',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup', { aliases: ['photos', 'pictures'] }),
       inputSchema: z.object({
         trailId: numericId('Numeric AllTrails trail id'),
         view: viewParam(ALLTRAILS_VIEWS, {
@@ -154,6 +158,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
         "built from the trail's offline-detail route geometry. Returns raw GPX XML suitable for saving to " +
         'a .gpx file or importing into navigation apps.',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup', { aliases: ['gpx', 'route', 'map', 'track'] }),
       inputSchema: z.object({
         trailId: numericId('Numeric AllTrails trail id'),
       }),
@@ -181,6 +186,7 @@ export function registerTrailTools(server: McpServer, client: AllTrailsClient): 
       title: 'Get AllTrails trail weather',
       description: 'Get the weather overview for an AllTrails trail by its numeric trail id.',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup', { aliases: ['weather', 'forecast', 'rain'] }),
       inputSchema: z.object({
         trailId: numericId('Numeric AllTrails trail id'),
       }),
