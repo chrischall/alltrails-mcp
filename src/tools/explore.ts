@@ -13,6 +13,7 @@ import {
   summarizeLocation,
   summarizeSearchResult,
 } from './_shared.js';
+import { TRAIL_ALIASES, travelMeta } from './hints.js';
 
 // The location record types the geocoder requests (a subset of the suggestions
 // record types — places and points of interest, not trails/guides/lists).
@@ -52,6 +53,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
         'per-result summaries, capped at limit client-side, by default; pass view:"full" for ' +
         "AllTrails' whole records.",
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup', { aliases: TRAIL_ALIASES }),
       inputSchema: z.object({
         query: z
           .string()
@@ -133,6 +135,7 @@ export function registerExploreTools(server: McpServer, client: AllTrailsClient)
         'NOTE: the returned id is an Algolia search id and is NOT the id the trail-listing tools take; ' +
         'to find trails for a place, feed the resolved name back into alltrails_search.',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup', { aliases: ['where is', 'place', 'park', 'trailhead'] }),
       inputSchema: z.object({
         query: z.string().describe('Place name to resolve, e.g. "portland oregon" or "zion"'),
         kinds: z

@@ -6,6 +6,8 @@ import { parseAllTrails } from '../validate.js';
 import {
   ALLTRAILS_VIEWS,
   CompletedTrailsSchema,
+  briefFeedLine,
+  textResponse,
   ProfileSchema,
   READ_ONLY_ANNOTATIONS,
   UserListsSchema,
@@ -21,6 +23,10 @@ import {
   summarizeTrail,
   summarizeUserList,
 } from './_shared.js';
+import { travelMeta } from './hints.js';
+
+/** The feed's rungs: the fleet's two, plus the context-groups one-liner. */
+const FEED_VIEWS = [...ALLTRAILS_VIEWS, 'brief'] as const;
 
 // Per-user read tools. These require a signed-in session (the captured browser
 // cookie), and resolve the target user id from the argument, ALLTRAILS_USER_ID,
@@ -34,6 +40,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         'Get the signed-in AllTrails user profile (via /api/alltrails/me). Requires a signed-in session. ' +
         'Returns identity fields { id, username, slug, firstName, lastName, location, isPro } by default; pass view:"full" for the whole record (includes email and account settings).',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup'),
       inputSchema: z.object({
         view: viewParam(ALLTRAILS_VIEWS, {
           note: 'compact returns the identity fields only; "full" returns AllTrails\' whole /me payload, including email and settings.',
@@ -60,6 +67,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         'pass a userId to target a specific public profile. Returns slim { id, name, itemCount, visibility } entries by default ' +
         '(feed an id to alltrails_get_list_items); pass view:"full" for the whole records.',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup', { aliases: ['saved trails', 'favorites', 'my lists'] }),
       inputSchema: z.object({
         userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
         view: viewParam(ALLTRAILS_VIEWS, {
@@ -94,6 +102,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         "trailId (hydrate with alltrails_get_trail), the curator's order, and any notes — not trail " +
         'details. Returns slim { trailId, type, order, notes, addedAt } entries sorted by order by default; pass view:"full" for the whole records.',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup', { aliases: ['saved trails', 'favorites'] }),
       inputSchema: z.object({
         listId: numericId('Numeric AllTrails list id'),
         view: viewParam(ALLTRAILS_VIEWS, {
@@ -128,6 +137,7 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         'to target a specific public profile. Returns slim trail summaries (name, length, elevation, difficulty, rating) by default; ' +
         'pass view:"full" for the whole records.',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('lookup', { aliases: ['hikes i have done', 'completed trails', 'my hikes'] }),
       inputSchema: z.object({
         userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
         view: viewParam(ALLTRAILS_VIEWS, {
@@ -160,8 +170,13 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
         "Get an AllTrails user's activity feed (recorded hikes and posts). Defaults to the signed-in user; " +
         'pass a userId to target a specific public profile. Without a feed argument this returns the feed ' +
         'DIRECTORY (the available feeds: local, timeline (following), personal (own posts)) — pass feed to ' +
-        'get the actual items. Returns slim projections by default; pass view:"full" for the whole records.',
+        'get the actual items. Returns slim projections by default; pass view:"full" for the whole records, or ' +
+        'view:"brief" for one line per item (brief reads the timeline when no feed is named).',
       annotations: READ_ONLY_ANNOTATIONS,
+      _meta: travelMeta('whats-new', {
+        canonical: true,
+        aliases: ['hikes', 'hiking', 'friends', 'activity', 'trails'],
+      }),
       inputSchema: z.object({
         userId: numericId('Numeric AllTrails user id. Defaults to the signed-in user.').optional(),
         feed: z
@@ -180,15 +195,21 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
           .string()
           .describe('Opaque nextCursor from a previous page, for pagination')
           .optional(),
-        view: viewParam(ALLTRAILS_VIEWS, {
-          note: 'compact returns { count, hasNextPage, nextCursor, items: [{ type, timestamp, description, user, trail, activity, review }] } — and the no-feed directory as { name, displayName } per feed; "full" returns AllTrails\' whole records.',
-        }),
+        view: z
+          .enum(FEED_VIEWS)
+          .describe(
+            'Response shape. "compact" (default) returns { count, hasNextPage, nextCursor, items: [{ type, timestamp, description, user, trail, activity, review }] } — and the no-feed directory as { name, displayName } per feed; "full" returns AllTrails\' whole records; "brief" returns one line per item, "who: what — <ISO date or no date> — <recorded|reviewed|…>", and reads the timeline (people you follow) when no feed is named.',
+          )
+          .optional(),
       }),
     },
     async (args) => {
       const userId = await resolveUserId(client, args.userId);
       const base = `/api/alltrails/community/blazes/v0/users/${encodeURIComponent(userId)}/feeds`;
-      if (!args.feed) {
+      const brief = args.view === 'brief';
+      // A brief read answers "what's new", so it reads items, never the directory.
+      const feed = args.feed ?? (brief ? 'timeline' : undefined);
+      if (!feed) {
         const raw = await client.request('GET', base);
         if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
           const parsed = parseAllTrails(FeedDirectorySchema, raw, 'GET .../feeds');
@@ -208,7 +229,14 @@ export function registerUserTools(server: McpServer, client: AllTrailsClient): v
       if (args.maxItems !== undefined) params.set('maxItems', String(args.maxItems));
       if (args.cursor !== undefined) params.set('cursor', args.cursor);
       const qs = params.size > 0 ? `?${params.toString()}` : '';
-      const raw = await client.request('GET', `${base}/${args.feed}${qs}`);
+      const raw = await client.request('GET', `${base}/${feed}${qs}`);
+      if (brief) {
+        const parsed = parseAllTrails(FeedPageSchema, raw, 'GET .../feeds/{feed}');
+        const lines = (parsed?.sections ?? [])
+          .filter((s) => s.itemData !== undefined && s.itemData !== null)
+          .map((s) => briefFeedLine(s.itemData!));
+        return textResponse(lines.length > 0 ? lines.join('\n') : 'No new activity.');
+      }
       if (resolveView(args.view, ALLTRAILS_VIEWS) === 'compact') {
         const parsed = parseAllTrails(FeedPageSchema, raw, 'GET .../feeds/{feed}');
         if (Array.isArray(parsed?.sections)) {

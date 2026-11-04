@@ -129,12 +129,13 @@ The per-user tools default to the signed-in user (resolved via `/api/alltrails/m
 
 `alltrails_search`, `alltrails_get_trail`, `alltrails_get_trail_reviews`,
 `alltrails_get_trail_photos`, `alltrails_get_list_items` and
-`alltrails_get_activity_feed` take a `view` parameter with two rungs:
+`alltrails_get_activity_feed` take a `view` parameter with two rungs (the feed has a third, `brief`):
 
 | `view` | What you get |
 |--------|--------------|
 | `compact` | **The default.** The slim projection described in the table above — the fields a caller acts on. Nothing to pass. |
 | `full` | AllTrails' whole untouched record. |
+| `brief` | `alltrails_get_activity_feed` only: one line per item, `who: what — <ISO date \| no date> — <recorded\|reviewed\|…>`, reading the `timeline` feed when none is named. The context-groups (mcp-host) canonical *what's new* read. |
 
 Compact is the default deliberately. These projections existed before, behind
 `compact: false` and a tool description asking the caller to please opt in — and
