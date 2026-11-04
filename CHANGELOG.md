@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.1](https://github.com/chrischall/alltrails-mcp/compare/v3.2.0...v3.2.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **brief:** align the brief view with the fleet contract ([#186](https://github.com/chrischall/alltrails-mcp/issues/186)) ([8060b2e](https://github.com/chrischall/alltrails-mcp/commit/8060b2e5d383b724edf7a4e82d43cd3d95d2245c))
+* **deps:** Bump @chrischall/mcp-utils ([#184](https://github.com/chrischall/alltrails-mcp/issues/184)) ([9659702](https://github.com/chrischall/alltrails-mcp/commit/9659702d9d39c50b3961e9294d680c834a4cd24a))
+
 ## [3.2.0](https://github.com/chrischall/alltrails-mcp/compare/v3.1.11...v3.2.0) (2026-11-04)
 
 
