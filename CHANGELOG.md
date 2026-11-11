@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.2](https://github.com/chrischall/alltrails-mcp/compare/v3.2.1...v3.2.2) (2026-11-11)
+
+
+### Bug Fixes
+
+* **deps:** Bump the production-dependencies group with 2 updates ([#188](https://github.com/chrischall/alltrails-mcp/issues/188)) ([80cc5d7](https://github.com/chrischall/alltrails-mcp/commit/80cc5d7ef199d0bd19af8ffb52384e2a6d3c86b0))
+
 ## [3.2.1](https://github.com/chrischall/alltrails-mcp/compare/v3.2.0...v3.2.1) (2026-11-04)
 
 
